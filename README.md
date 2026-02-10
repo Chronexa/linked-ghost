@@ -10,13 +10,13 @@ Transform industry news, insights, and data into engaging LinkedIn posts in unde
 
 ### ✅ **Frontend: COMPLETE** (14 pages, design system, components)
 ### ✅ **Backend Infrastructure: COMPLETE** (database, auth, Redis)
-### ✅ **API Endpoints: COMPLETE** (23 endpoints, Phase 1)
+### ✅ **API Endpoints: COMPLETE** (25 endpoints, Phase 1 + 2.3)
 ### 🔄 **AI Integration: IN PROGRESS** (Phase 2)
 - ✅ Voice Analysis with OpenAI embeddings
 - ✅ Similarity scoring & consistency calculation
 - ✅ Draft Generation with GPT-4o (3 variants, voice matching)
-- 🔄 Topic classification (next)
-- 🔄 Perplexity integration (upcoming)
+- ✅ Topic Classification with GPT-4o-mini (batch processing, auto-review)
+- 🔄 Perplexity integration (next)
 
 ---
 
