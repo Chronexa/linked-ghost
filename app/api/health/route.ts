@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { testConnection } from '@/lib/db';
 import { testRedisConnection } from '@/lib/redis';
+import { testOpenAIConnection } from '@/lib/ai/openai';
 
 /**
  * GET /api/health
@@ -15,14 +16,17 @@ export async function GET(req: NextRequest) {
   try {
     const startTime = Date.now();
 
-    // Test database connection
-    const dbHealthy = await testConnection().catch(() => false);
-
-    // Test Redis connection
-    const redisHealthy = await testRedisConnection().catch(() => false);
+    // Test all service connections in parallel
+    const [dbHealthy, redisHealthy, openaiHealthy] = await Promise.all([
+      testConnection().catch(() => false),
+      testRedisConnection().catch(() => false),
+      testOpenAIConnection().catch(() => false),
+    ]);
 
     const responseTime = Date.now() - startTime;
 
+    // System is healthy if critical services (DB, Redis) are up
+    // OpenAI is important but not critical for basic operations
     const isHealthy = dbHealthy && redisHealthy;
     const status = isHealthy ? 200 : 503;
 
@@ -33,6 +37,7 @@ export async function GET(req: NextRequest) {
         services: {
           database: dbHealthy ? 'up' : 'down',
           redis: redisHealthy ? 'up' : 'down',
+          openai: openaiHealthy ? 'up' : 'down',
         },
         responseTime: `${responseTime}ms`,
         version: '1.0.0',

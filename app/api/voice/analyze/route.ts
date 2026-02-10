@@ -1,6 +1,6 @@
 /**
  * Voice Analysis API
- * POST /api/voice/analyze - Analyze and calculate voice confidence score
+ * POST /api/voice/analyze - Analyze and calculate voice confidence score using OpenAI embeddings
  */
 
 import { NextRequest } from 'next/server';
@@ -9,12 +9,12 @@ import { responses, errors } from '@/lib/api/response';
 import { rateLimit } from '@/lib/api/rate-limit';
 import { db } from '@/lib/db';
 import { voiceExamples, profiles } from '@/lib/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
+import { generateEmbeddings, calculateVoiceConsistency, averageEmbedding, getVoiceRecommendation } from '@/lib/ai/embeddings';
 
 /**
  * POST /api/voice/analyze
- * Analyze voice examples and calculate confidence score
- * This is a simplified version - full implementation will use OpenAI embeddings
+ * Analyze voice examples using OpenAI embeddings and calculate confidence score
  */
 export const POST = withAuth(async (req: NextRequest, { user }) => {
   try {
@@ -28,6 +28,7 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
       .from(voiceExamples)
       .where(eq(voiceExamples.userId, user.id));
 
+    // Validation
     if (examples.length === 0) {
       return errors.badRequest('No voice examples found. Add at least 3 examples to analyze your voice.');
     }
@@ -36,38 +37,97 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
       return errors.badRequest('At least 3 voice examples are required for accurate voice analysis.');
     }
 
-    // Calculate voice confidence score (simplified)
-    // TODO: Implement full voice analysis with OpenAI embeddings
-    const baseScore = 50;
-    const exampleBonus = Math.min(examples.length * 8, 40); // Up to 40 points for examples
-    const lengthBonus = examples.every(e => e.characterCount >= 200) ? 10 : 5;
+    console.log(`🧠 Analyzing ${examples.length} voice examples for user ${user.id}...`);
 
-    const confidenceScore = Math.min(baseScore + exampleBonus + lengthBonus, 100);
+    // Extract post texts
+    const postTexts = examples.map((ex) => ex.postText);
 
-    // Update profile with confidence score
-    const [updatedProfile] = await db
-      .update(profiles)
-      .set({
-        voiceConfidenceScore: confidenceScore,
-        lastVoiceTrainingAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(profiles.userId, user.id))
-      .returning();
+    // Generate embeddings using OpenAI (batch request for efficiency)
+    console.log('🔄 Generating embeddings with OpenAI...');
+    const embeddings = await generateEmbeddings(postTexts);
+
+    // Calculate voice consistency score
+    const confidenceScore = calculateVoiceConsistency(embeddings);
+
+    console.log(`✅ Voice confidence score: ${confidenceScore}`);
+
+    // Calculate average embedding (master voice profile)
+    const masterVoiceEmbedding = averageEmbedding(embeddings);
+
+    // Store individual embeddings in voice_examples
+    console.log('💾 Storing embeddings in database...');
+    
+    await Promise.all(
+      examples.map((example, index) =>
+        db
+          .update(voiceExamples)
+          .set({
+            embedding: embeddings[index],
+          })
+          .where(eq(voiceExamples.id, example.id))
+      )
+    );
+
+    // Update or create profile with master voice embedding and score
+    const existingProfile = await db.query.profiles.findFirst({
+      where: eq(profiles.userId, user.id),
+    });
+
+    let updatedProfile;
+
+    if (existingProfile) {
+      [updatedProfile] = await db
+        .update(profiles)
+        .set({
+          voiceConfidenceScore: confidenceScore,
+          voiceEmbedding: masterVoiceEmbedding,
+          lastVoiceTrainingAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(profiles.userId, user.id))
+        .returning();
+    } else {
+      [updatedProfile] = await db
+        .insert(profiles)
+        .values({
+          userId: user.id,
+          voiceConfidenceScore: confidenceScore,
+          voiceEmbedding: masterVoiceEmbedding,
+          lastVoiceTrainingAt: new Date(),
+        })
+        .returning();
+    }
+
+    const recommendation = getVoiceRecommendation(confidenceScore, examples.length);
+
+    console.log('✅ Voice analysis complete!');
 
     return responses.ok({
       confidenceScore,
       examplesAnalyzed: examples.length,
-      recommendation:
-        confidenceScore >= 85
-          ? 'Excellent! Your voice profile is well-trained.'
-          : confidenceScore >= 70
-          ? 'Good voice profile. Add 2-3 more examples for better results.'
-          : 'Add more examples (5-10 recommended) for better voice matching.',
-      profile: updatedProfile,
+      recommendation,
+      profile: {
+        id: updatedProfile.id,
+        voiceConfidenceScore: updatedProfile.voiceConfidenceScore,
+        lastVoiceTrainingAt: updatedProfile.lastVoiceTrainingAt,
+      },
+      insights: {
+        embeddingDimensions: masterVoiceEmbedding.length,
+        averagePostLength: Math.round(
+          examples.reduce((sum, ex) => sum + ex.characterCount, 0) / examples.length
+        ),
+        shortestPost: Math.min(...examples.map((ex) => ex.characterCount)),
+        longestPost: Math.max(...examples.map((ex) => ex.characterCount)),
+      },
     });
   } catch (error) {
     console.error('Error analyzing voice:', error);
-    return errors.internal('Failed to analyze voice');
+    
+    // Provide helpful error message
+    if (error instanceof Error && error.message.includes('API key')) {
+      return errors.internal('OpenAI API key is invalid or missing');
+    }
+    
+    return errors.internal('Failed to analyze voice. Please try again.');
   }
 });
