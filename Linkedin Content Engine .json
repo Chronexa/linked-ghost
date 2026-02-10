@@ -1,0 +1,2043 @@
+{
+  "name": "Linkedin Content Engine 2.0",
+  "nodes": [
+    {
+      "parameters": {
+        "model": "sonar-pro",
+        "messages": {
+          "message": [
+            {
+              "content": "={{ $json.System_Prompt }}\n\nCRITICAL: Return your response ONLY as a valid JSON array. No markdown, no explanation, just pure JSON.\n\nFormat:\n[\n  {\n    \"title\": \"Story headline\",\n    \"source\": \"Source name\",\n    \"context\": \"What happened\",\n    \"why_nris_care\": \"Why this matters for NRIs\",\n    \"linkedin_angle\": \"Hook for LinkedIn post\",\n    \"link\": \"https://source-url.com\"\n  }\n]\n\nReturn NOTHING except the JSON array. No ```json wrapper, no text before or after.",
+              "role": "system"
+            },
+            {
+              "content": "={{ $json.User_Prompt }}"
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "searchRecency": "day"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.perplexity",
+      "typeVersion": 1,
+      "position": [
+        624,
+        16
+      ],
+      "id": "2c25c7b6-0b80-46c5-83cc-534fd679cfc3",
+      "name": "Search NRI Content",
+      "credentials": {
+        "perplexityApi": {
+          "id": "B06oD2kIkRZ5ZtRs",
+          "name": "Perplexity account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get ChatGPT response\nconst chatGptResponse = $input.first().json;\n\n// Get active user\nconst userId = $('Get Active Profile').first().json.id;\n\n// Extract stories from ChatGPT's response structure\nlet stories;\n\ntry {\n  // ChatGPT returns: [{ message: { content: { stories: [...] }}}]\n  if (Array.isArray(chatGptResponse) && chatGptResponse[0]?.message?.content?.stories) {\n    stories = chatGptResponse[0].message.content.stories;\n  }\n  // Alternative: Direct content object\n  else if (chatGptResponse.message?.content?.stories) {\n    stories = chatGptResponse.message.content.stories;\n  }\n  // Alternative: Content is already stories array\n  else if (Array.isArray(chatGptResponse.stories)) {\n    stories = chatGptResponse.stories;\n  }\n  // Fallback: Try to find stories in the response\n  else {\n    const contentStr = JSON.stringify(chatGptResponse);\n    const parsed = JSON.parse(contentStr);\n    stories = parsed.stories || [parsed];\n  }\n\n  // Ensure it's an array\n  if (!Array.isArray(stories)) {\n    stories = [stories];\n  }\n\n  // Filter out empty stories\n  stories = stories.filter(s => s && (s.title || s.content));\n\n} catch (e) {\n  console.error(\"Failed to parse ChatGPT output:\", e);\n  // Fallback: store raw response as one row\n  return [{\n    json: {\n      User_ID: [userId],\n      Source: \"Perplexity\",\n      Content: JSON.stringify(chatGptResponse),\n      URL: null,\n      Status: \"New\"\n    }\n  }];\n}\n\n// Safety check\nif (stories.length === 0) {\n  return [{\n    json: {\n      User_ID: [userId],\n      Source: \"Perplexity\",\n      Content: \"No stories found in response\",\n      URL: null,\n      Status: \"New\"\n    }\n  }];\n}\n\n// Map each story to an Airtable row\nreturn stories.map((story) => {\n  // Combine title and content for better readability\n  const fullContent = story.title \n    ? `**${story.title}**\\n\\n${story.content || ''}`\n    : (story.content || JSON.stringify(story));\n\n  return {\n    json: {\n      User_ID: [userId],\n      Source: \"Perplexity\",\n      Content: fullContent.trim(),\n      URL: story.url || null,\n      Status: \"New\"\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        16
+      ],
+      "id": "caeaefca-17bd-4c66-af49-388128c51ec1",
+      "name": "Format Content for Storage"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appKdBdH3CgEliADP",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Content Engine",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblp4dVNRHNgaMTuB",
+          "mode": "list",
+          "cachedResultName": "Raw_Content",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP/tblp4dVNRHNgaMTuB"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Users": "={{ $json.User_ID }}",
+            "Source": "={{ $json.Source }}",
+            "Content": "={{ $json.Content }}",
+            "URL": "={{ Array.isArray($json.URL) ? $json.URL[0] : ($json.URL || '') }}\n",
+            "Status": "={{ $json.Status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Content_ID",
+              "displayName": "Content_ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Users",
+              "displayName": "Users",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "User_ID (from Users)",
+              "displayName": "User_ID (from Users)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Perplexity",
+                  "value": "Perplexity"
+                },
+                {
+                  "name": "Reddit",
+                  "value": "Reddit"
+                },
+                {
+                  "name": "Manual",
+                  "value": "Manual"
+                },
+                {
+                  "name": "Fireflies",
+                  "value": "Fireflies"
+                },
+                {
+                  "name": "Company",
+                  "value": "Company"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Content",
+              "displayName": "Content",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "URL",
+              "displayName": "URL",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Created_Date",
+              "displayName": "Created_Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "New",
+                  "value": "New"
+                },
+                {
+                  "name": "Processing",
+                  "value": "Processing"
+                },
+                {
+                  "name": "Classified",
+                  "value": "Classified"
+                },
+                {
+                  "name": "Archived",
+                  "value": "Archived"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Classified_Content",
+              "displayName": "Classified_Content",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "Pillar_Override",
+              "displayName": "Pillar_Override",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "AI_Tech",
+                  "value": "AI_Tech"
+                },
+                {
+                  "name": "Client",
+                  "value": "Client"
+                },
+                {
+                  "name": "Educational",
+                  "value": "Educational"
+                },
+                {
+                  "name": "Founder",
+                  "value": "Founder"
+                },
+                {
+                  "name": "Industry",
+                  "value": "Industry"
+                },
+                {
+                  "name": "Product",
+                  "value": "Product"
+                },
+                {
+                  "name": "Thought_Leadership",
+                  "value": "Thought_Leadership"
+                }
+              ],
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        1424,
+        16
+      ],
+      "id": "85b41c1f-9508-4d10-b75a-5750f5fc1fd0",
+      "name": "Create a record",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "kpou4UG1ojn8ZIQF",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "LinkedIn - Content Classification\n",
+        "height": 80,
+        "width": 208,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        176,
+        304
+      ],
+      "typeVersion": 1,
+      "id": "72582a31-42b7-40d5-9e74-f569ee9d7430",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "value": "appKdBdH3CgEliADP",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Content Engine",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblp4dVNRHNgaMTuB",
+          "mode": "list",
+          "cachedResultName": "Raw_Content",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP/tblp4dVNRHNgaMTuB"
+        },
+        "id": "={{$json.body.id}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        176,
+        432
+      ],
+      "id": "024ea94c-e4a2-483b-b7be-b6d709f33e28",
+      "name": "Get New Content",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "kpou4UG1ojn8ZIQF",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "chatgpt-4o-latest",
+          "mode": "list",
+          "cachedResultName": "CHATGPT-4O-LATEST"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.Classification_Prompt }}",
+              "role": "system"
+            },
+            {
+              "content": "={{ $('Determine Pillar').item.json.content_text }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        1424,
+        432
+      ],
+      "id": "877848c4-1a16-4ab8-9d63-fa23e26e5e51",
+      "name": "Classify Content",
+      "credentials": {
+        "openAiApi": {
+          "id": "wpj1vFviNtVGq16T",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse ChatGPT response\nconst response = $input.first().json.message.content;\n\n// Content is already JSON object, not a string\nconst classification = response;\n\n// Get original content data from Determine Pillar node\nconst contentData = $('Determine Pillar').first().json;\n\n// Return structured data\nreturn [{\n  json: {\n    record_id: contentData.content_id,\n    user_id: contentData.user_id,\n    pillar: classification.pillar,\n    hook_angle: classification.hook_angle,\n    score: classification.score,\n    reasoning: classification.reasoning\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1776,
+        432
+      ],
+      "id": "feb69369-f5bb-4f5a-b3e8-43536b3ae283",
+      "name": "Extract Classification"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3bbb5763-9c3a-4ff6-a6d2-087fbd3f11a6",
+              "leftValue": "={{ $json.score }}",
+              "rightValue": 70,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2000,
+        432
+      ],
+      "id": "2cb56967-87be-4627-8350-8acd08f18618",
+      "name": "Score Check"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appKdBdH3CgEliADP",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Content Engine",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblp4dVNRHNgaMTuB",
+          "mode": "list",
+          "cachedResultName": "Raw_Content",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP/tblp4dVNRHNgaMTuB"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Determine Pillar').item.json.content_id }}",
+            "Status": "Classified",
+            "User_Content_Pillars": "={{ [ $('Get ContentPillar ID').item.json.id ] }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true
+            },
+            {
+              "id": "Content_ID",
+              "displayName": "Content_ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Users",
+              "displayName": "Users",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "User_ID (from Users)",
+              "displayName": "User_ID (from Users)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Perplexity",
+                  "value": "Perplexity"
+                },
+                {
+                  "name": "Reddit",
+                  "value": "Reddit"
+                },
+                {
+                  "name": "Manual",
+                  "value": "Manual"
+                },
+                {
+                  "name": "Fireflies",
+                  "value": "Fireflies"
+                },
+                {
+                  "name": "Company",
+                  "value": "Company"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Content",
+              "displayName": "Content",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "URL",
+              "displayName": "URL",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Created_Date",
+              "displayName": "Created_Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "New",
+                  "value": "New"
+                },
+                {
+                  "name": "Processing",
+                  "value": "Processing"
+                },
+                {
+                  "name": "Classified",
+                  "value": "Classified"
+                },
+                {
+                  "name": "Archived",
+                  "value": "Archived"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Classified_Content",
+              "displayName": "Classified_Content",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "User_Content_Pillars",
+              "displayName": "User_Content_Pillars",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Pillar Name",
+              "displayName": "Pillar Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Voice Style",
+              "displayName": "Voice Style",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Target Audience",
+              "displayName": "Target Audience",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Classification_Prompt",
+              "displayName": "Classification_Prompt",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        2448,
+        336
+      ],
+      "id": "24c10ad6-6cdc-4359-98af-ab05a35f6ef4",
+      "name": "Update record",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "kpou4UG1ojn8ZIQF",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appKdBdH3CgEliADP",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Content Engine",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblp4dVNRHNgaMTuB",
+          "mode": "list",
+          "cachedResultName": "Raw_Content",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP/tblp4dVNRHNgaMTuB"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Extract Classification').item.json.record_id }}",
+            "Status": "Archived"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Content_ID",
+              "displayName": "Content_ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Users",
+              "displayName": "Users",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "User_ID (from Users)",
+              "displayName": "User_ID (from Users)",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Perplexity",
+                  "value": "Perplexity"
+                },
+                {
+                  "name": "Reddit",
+                  "value": "Reddit"
+                },
+                {
+                  "name": "Manual",
+                  "value": "Manual"
+                },
+                {
+                  "name": "Fireflies",
+                  "value": "Fireflies"
+                },
+                {
+                  "name": "Company",
+                  "value": "Company"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Content",
+              "displayName": "Content",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "URL",
+              "displayName": "URL",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Created_Date",
+              "displayName": "Created_Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "New",
+                  "value": "New"
+                },
+                {
+                  "name": "Processing",
+                  "value": "Processing"
+                },
+                {
+                  "name": "Classified",
+                  "value": "Classified"
+                },
+                {
+                  "name": "Archived",
+                  "value": "Archived"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Classified_Content",
+              "displayName": "Classified_Content",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        2224,
+        528
+      ],
+      "id": "abda7ca9-e05f-46c5-8a60-d36eab3d3048",
+      "name": "Mark as Archived",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "kpou4UG1ojn8ZIQF",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "LinkedIn - Draft Generation",
+        "height": 80,
+        "width": 208,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        192,
+        640
+      ],
+      "typeVersion": 1,
+      "id": "2f22c77a-646a-46e4-9cbd-118374a29703",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "base": {
+          "__rl": true,
+          "value": "appKdBdH3CgEliADP",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Content Engine",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl4pX2JOyuzfppT3",
+          "mode": "list",
+          "cachedResultName": "Classified_Content",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP/tbl4pX2JOyuzfppT3"
+        },
+        "id": "={{$json.body.id}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        176,
+        752
+      ],
+      "id": "e2f029f8-ece9-4538-b2e0-d3429120bc29",
+      "name": "Get Pending Content",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "kpou4UG1ojn8ZIQF",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appKdBdH3CgEliADP",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Content Engine",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblUzJUiyJ7eacuWj",
+          "mode": "list",
+          "cachedResultName": "Voice_Examples",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP/tblUzJUiyJ7eacuWj"
+        },
+        "filterByFormula": "=AND(\n  {Status} = 'Active',\n  {Pillar Name} = '{{ $json[\"Pillar\"] }}'\n)",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        624,
+        752
+      ],
+      "id": "0c7f6608-3704-4178-b566-9a35a5def545",
+      "name": "Get Voice Examples",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "kpou4UG1ojn8ZIQF",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $('Get Pillar Config').first().json.Draft_Generation_Prompt }}\n\n## YOUR VOICE (Study these examples):\n\n{{ $('Get Voice Examples').all().map(ex => `EXAMPLE ${ex.json.Example_ID}:\\n${ex.json.Post_Text}\\n`).join('\\n---\\n\\n') }}\n\n## TODAY'S CONTENT:\n\n{{ $('Get Pending Content').item.json.Content }}\n\nCRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no extra text.\n",
+              "role": "system"
+            },
+            {
+              "content": "=Generate 1 LinkedIn post based on the content and voice examples provided. Return the result as a JSON array with one object only, exactly in this shape:\n\n[\n  {\n    \"hook\": \"...\",\n    \"body\": \"...\",\n    \"cta\": \"...\",\n    \"hashtags\": \"...\"\n  }\n]\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        848,
+        752
+      ],
+      "id": "5dd9e75d-01c4-4247-be5b-7adca933763f",
+      "name": "Generate Draft Variants",
+      "executeOnce": true,
+      "credentials": {
+        "openAiApi": {
+          "id": "wpj1vFviNtVGq16T",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the ChatGPT response\nconst aiResponse = $input.first().json;\n\n// Extract the pillar name from ChatGPT's response\nconst pillarFromAI = aiResponse.message.content.trim();\n\n// Get the original content data from \"Get New Content\" node\nconst originalContent = $('Get New Content').first().json;\n\n// Get user data from \"Get User Classification Prompt\"\nconst userData = $('Get User Classification Prompt\"').first().json;\n\n// Valid pillar names (updated to match your new Airtable names)\nconst validPillars = [\n  'Founder_Journey',\n  'NRI_CrossBorder_Wealth',\n  'AI_Wealth_Hybrid',\n  'US_Finance_Investment',\n  'Industry_Commentary',\n  'Product_Updates',\n  'Customer_Stories'\n];\n\n// Validate the AI's pillar suggestion\nlet finalPillar;\n\nif (validPillars.includes(pillarFromAI)) {\n  finalPillar = pillarFromAI;\n} else {\n  // If AI returned invalid pillar, default to first available\n  console.log(`AI returned invalid pillar: \"${pillarFromAI}\", defaulting to first pillar`);\n  finalPillar = validPillars[0]; // Founder_Journey\n}\n\n// Return structured data as ARRAY (important!)\nreturn [{\n  json: {\n    content_id: originalContent.id,\n    user_id: originalContent.Users,\n    pillar: finalPillar,\n    ai_suggested_pillar: pillarFromAI,\n    content_text: originalContent.Content,\n    source: originalContent.Source,\n    url: originalContent.URL || '',\n    created_date: originalContent.Created_Date\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        432
+      ],
+      "id": "cb5c162b-def6-4483-a67b-01d18ebce13e",
+      "name": "Determine Pillar"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appKdBdH3CgEliADP",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Content Engine",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblQfkYmOXJH1LSV2",
+          "mode": "list",
+          "cachedResultName": "User_Content_Pillars",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP/tblQfkYmOXJH1LSV2"
+        },
+        "filterByFormula": "=AND({Pillar} = '{{ $json[\"Pillar Name\"] }}', {Status} = 'Active')",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        400,
+        752
+      ],
+      "id": "0ef026f4-ddef-43d4-add8-f051e36ba1c4",
+      "name": "Get Pillar Config",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "kpou4UG1ojn8ZIQF",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appKdBdH3CgEliADP",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Content Engine",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblXyMmf7Xn8rHlGS",
+          "mode": "list",
+          "cachedResultName": "Generated_Posts",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP/tblXyMmf7Xn8rHlGS"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Topic_ID": "={{ [ $node[\"Get Pending Content\"].json.id ] }}",
+            "User_ID": "={{ [$json.user_id] }}",
+            "Pillar": "={{ [$json.pillar] }}",
+            "Draft_Letter": "={{ $json.draft_letter }}",
+            "Draft_Text": "={{ $json.draft_text }}",
+            "Status": "={{ $json.status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Post_ID",
+              "displayName": "Post_ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Topic_ID",
+              "displayName": "Topic_ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "User_ID",
+              "displayName": "User_ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Pillar",
+              "displayName": "Pillar",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Pillar Name",
+              "displayName": "Pillar Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Draft_Letter",
+              "displayName": "Draft_Letter",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "A",
+                  "value": "A"
+                },
+                {
+                  "name": "B",
+                  "value": "B"
+                },
+                {
+                  "name": "C",
+                  "value": "C"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Draft_Text",
+              "displayName": "Draft_Text",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Draft",
+                  "value": "Draft"
+                },
+                {
+                  "name": "Approved",
+                  "value": "Approved"
+                },
+                {
+                  "name": "Rejected",
+                  "value": "Rejected"
+                },
+                {
+                  "name": "Posted",
+                  "value": "Posted"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Created_Date",
+              "displayName": "Created_Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Approved_Date",
+              "displayName": "Approved_Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        1424,
+        752
+      ],
+      "id": "1c03f177-e4bd-4721-a1a0-9862e3581d05",
+      "name": "Store Drafts",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "kpou4UG1ojn8ZIQF",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appKdBdH3CgEliADP",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Content Engine",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl9lf6IsAMPhz02p",
+          "mode": "list",
+          "cachedResultName": "Prompts",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP/tbl9lf6IsAMPhz02p"
+        },
+        "filterByFormula": "={{ \n  $if(\n    $(\"Research Trigger\").isExecuted,\n    \"RECORD_ID() = '\" + $(\"Research Trigger\").item.json[\"body\"][\"id\"] + \"'\",\n    \"{Status} = 'Active'\"\n  ) \n}}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        400,
+        16
+      ],
+      "id": "60921b59-cbe5-4aa5-9fd6-83c42faf82be",
+      "name": "Get Perplexity Prompt",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "kpou4UG1ojn8ZIQF",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Content Research",
+        "height": 80,
+        "width": 208,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        192,
+        -112
+      ],
+      "typeVersion": 1,
+      "id": "e9648b73-fcb6-45cf-bd59-e24c4da14263",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appKdBdH3CgEliADP",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Content Engine",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblglnxMaXSLF5GvQ",
+          "mode": "list",
+          "cachedResultName": "Users",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP/tblglnxMaXSLF5GvQ"
+        },
+        "filterByFormula": "{Status} = 'Active'",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        176,
+        16
+      ],
+      "id": "30c23d97-8f1f-4170-844e-27bc4becfb81",
+      "name": "Get Active Profile",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "kpou4UG1ojn8ZIQF",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appKdBdH3CgEliADP",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Content Engine",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblglnxMaXSLF5GvQ",
+          "mode": "list",
+          "cachedResultName": "Users",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP/tblglnxMaXSLF5GvQ"
+        },
+        "filterByFormula": "=RECORD_ID() = '{{ $json[\"Users\"][0] }}'",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        400,
+        432
+      ],
+      "id": "dcee7e13-80eb-469b-b569-d0f1b2fb66d9",
+      "name": "Get User Classification Prompt\"",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "kpou4UG1ojn8ZIQF",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appKdBdH3CgEliADP",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Content Engine",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblQfkYmOXJH1LSV2",
+          "mode": "list",
+          "cachedResultName": "User_Content_Pillars",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP/tblQfkYmOXJH1LSV2"
+        },
+        "filterByFormula": "=AND({Pillar} = '{{ $json.pillar }}', {Status} = 'Active')",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        1200,
+        432
+      ],
+      "id": "c992306e-f1ca-4633-be53-4e2f02632d4b",
+      "name": "Get ContentPillar ID",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "kpou4UG1ojn8ZIQF",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appKdBdH3CgEliADP",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Content Engine",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tbl4pX2JOyuzfppT3",
+          "mode": "list",
+          "cachedResultName": "Classified_Content",
+          "cachedResultUrl": "https://airtable.com/appKdBdH3CgEliADP/tbl4pX2JOyuzfppT3"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "User_ID": "={{ $json.user_id }}",
+            "Raw_Content_ID": "={{[ $json.record_id ]}}",
+            "AI_Score": "={{ $json.score }}",
+            "Hook_Angle": "={{ $json.hook_angle }}",
+            "Reasoning": "={{ $json.reasoning }}",
+            "Status": "Classified",
+            "Content": "={{ $('Get New Content').item.json.Content }}",
+            "Pillar": "={{ [ $('Get ContentPillar ID').item.json.id ] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Topic_ID",
+              "displayName": "Topic_ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "User_ID",
+              "displayName": "User_ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Raw_Content_ID",
+              "displayName": "Raw_Content_ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Content",
+              "displayName": "Content",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "AI_Score",
+              "displayName": "AI_Score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Pillar",
+              "displayName": "Pillar",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Pillar Name",
+              "displayName": "Pillar Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Hook_Angle",
+              "displayName": "Hook_Angle",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Rational",
+                  "value": "Rational"
+                },
+                {
+                  "name": "Emotional",
+                  "value": "Emotional"
+                },
+                {
+                  "name": "Aspirational",
+                  "value": "Aspirational"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Reasoning",
+              "displayName": "Reasoning",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Created_Date",
+              "displayName": "Created_Date",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Classified",
+                  "value": "Classified"
+                },
+                {
+                  "name": "Drafted",
+                  "value": "Drafted"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Generated_Posts",
+              "displayName": "Generated_Posts",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "array",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        2224,
+        336
+      ],
+      "id": "ab0291a8-af2e-45ca-a4ca-7af23398d0ed",
+      "name": "Store in Classified Table",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "kpou4UG1ojn8ZIQF",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "airtable-classify-raw",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -48,
+        432
+      ],
+      "id": "1ca7ca8a-3774-4ee1-875e-19ee9892d9c4",
+      "name": "Webhook",
+      "webhookId": "cf5fc1c6-850b-44c6-b0db-1c376a84e9ec"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -48,
+        -80
+      ],
+      "id": "0ee3920c-ed32-4b40-81d3-acfb36175f7d",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -48,
+        752
+      ],
+      "id": "9d413c77-7826-4590-b868-b30d3ab785cf",
+      "name": "Webhook1",
+      "webhookId": "573f6aaa-e8c1-4e1e-8bb7-66cc2093e139"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Input: 1 item from \"Generate Draft Variants\" (Execute Once)\n// Goal: parse the JSON string from ChatGPT and enrich it with metadata\n//       from \"Get Pending Content\", so Airtable can store it directly.\n\nconst results = [];\n\nfor (const item of items) {\n  const raw = item.json;\n\n  // 1) Get the JSON string returned by ChatGPT\n  const content = raw.message?.content ?? '';\n\n  // 2) Parse it into an object/array\n  let parsed;\n  try {\n    parsed = JSON.parse(content);\n  } catch (error) {\n    throw new Error(\n      'Could not parse ChatGPT JSON: ' + error.message + '\\nContent:\\n' + content\n    );\n  }\n\n  // 3) We expect an array with ONE object – take the first\n  const draft = Array.isArray(parsed) ? parsed[0] : parsed;\n\n  // 4) Pull metadata from \"Get Pending Content\"\n  const source = $item(0).$node['Get Pending Content'].json;\n\n  const topicId =\n    source.Topic_ID ?? source.Topic_ID ?? null; // numeric or text, whatever you use\n  const userId = Array.isArray(source.User_ID)\n    ? source.User_ID[0]\n    : source.User_ID ?? null;\n  const pillar = Array.isArray(source.Pillar)\n    ? source.Pillar[0]\n    : source.Pillar ?? null;\n\n  // 5) Build a single text field for the draft if you want everything together\n  const draftText = [\n    draft.hook ?? '',\n    '',\n    draft.body ?? '',\n    '',\n    draft.cta ?? '',\n    '',\n    draft.hashtags ?? '',\n  ].join('\\n');\n\n  // 6) Push final object for Airtable\n  results.push({\n    json: {\n      // Fields you want to map in Airtable\n      topic_id: topicId,\n      user_id: userId,\n      pillar: pillar,\n      draft_letter: 'A',            // single variant for now\n      draft_text: draftText,\n      status: 'Draft',              // or 'Pending Review', whatever your single-select uses\n\n      // Optional: keep pieces separate too (nice for future use)\n      hook: draft.hook ?? '',\n      body: draft.body ?? '',\n      cta: draft.cta ?? '',\n      hashtags: draft.hashtags ?? '',\n    },\n  });\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        752
+      ],
+      "id": "0ffa473e-952c-4f6c-9c1a-ff0c94a76a4b",
+      "name": "Extract Drafts Content"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "chatgpt-4o-latest",
+          "mode": "list",
+          "cachedResultName": "CHATGPT-4O-LATEST"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.Pillar_Classification_Prompt }}",
+              "role": "system"
+            },
+            {
+              "content": "={{ $('Get New Content').item.json.Content }}\nReturn Pillar"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        624,
+        432
+      ],
+      "id": "5b81b9a2-4267-4462-8f43-dde277af27ba",
+      "name": "Determine Pillar1",
+      "executeOnce": false,
+      "credentials": {
+        "openAiApi": {
+          "id": "wpj1vFviNtVGq16T",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a data parser. Take the text below and extract individual news stories/topics into a JSON array.\n\nEach story should have:\n- title: Brief headline\n- content: Full text of this story (keep all details)\n- url: Any URL mentioned in this story ({{ $json.citations }})\n\nReturn ONLY valid JSON array, nothing else.\n\nText to parse: {{ $json.message }}\n\nStrict rules:\nDo not repeat the same topic multiple times.\nIf we got the same topics but multiple records, then club them into one overall record.\nKeep unique topics.\n"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        848,
+        16
+      ],
+      "id": "8fbd3090-1363-4a97-8aaf-c7a01f055bc6",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "wpj1vFviNtVGq16T",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "research",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -48,
+        112
+      ],
+      "id": "507f64bb-cd1e-4549-aba4-31c4bad55608",
+      "name": "Research Trigger",
+      "webhookId": "fbab191b-c41c-454d-abd5-26217f85ee92"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Search NRI Content": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Content for Storage": {
+      "main": [
+        [
+          {
+            "node": "Create a record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get New Content": {
+      "main": [
+        [
+          {
+            "node": "Get User Classification Prompt\"",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Content": {
+      "main": [
+        [
+          {
+            "node": "Extract Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Classification": {
+      "main": [
+        [
+          {
+            "node": "Score Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Check": {
+      "main": [
+        [
+          {
+            "node": "Store in Classified Table",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark as Archived",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Content": {
+      "main": [
+        [
+          {
+            "node": "Get Pillar Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Voice Examples": {
+      "main": [
+        [
+          {
+            "node": "Generate Draft Variants",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Draft Variants": {
+      "main": [
+        [
+          {
+            "node": "Extract Drafts Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Pillar": {
+      "main": [
+        [
+          {
+            "node": "Get ContentPillar ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pillar Config": {
+      "main": [
+        [
+          {
+            "node": "Get Voice Examples",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Drafts": {
+      "main": [
+        []
+      ]
+    },
+    "Get Perplexity Prompt": {
+      "main": [
+        [
+          {
+            "node": "Search NRI Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Profile": {
+      "main": [
+        [
+          {
+            "node": "Get Perplexity Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get User Classification Prompt\"": {
+      "main": [
+        [
+          {
+            "node": "Determine Pillar1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get ContentPillar ID": {
+      "main": [
+        [
+          {
+            "node": "Classify Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store in Classified Table": {
+      "main": [
+        [
+          {
+            "node": "Update record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get New Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Active Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Drafts Content": {
+      "main": [
+        [
+          {
+            "node": "Store Drafts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Pillar1": {
+      "main": [
+        [
+          {
+            "node": "Determine Pillar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Format Content for Storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Research Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Active Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8a34385f-ebcf-4ec7-a80a-3cb99286884c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e255e3f1cb9bca7780811a1fd580a4a88652ee0013642184700e832754da20b2"
+  },
+  "id": "ap734aFINZTSSkUF",
+  "tags": []
+}

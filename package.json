@@ -1,0 +1,49 @@
+{
+  "name": "linkedin-automation",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:drop": "drizzle-kit drop",
+    "db:test": "tsx scripts/test-db.ts",
+    "redis:test": "tsx scripts/test-redis.ts",
+    "check-env": "tsx scripts/check-env.ts",
+    "setup": "npm run check-env && npm run db:test && npm run redis:test",
+    "postinstall": "npm run check-env || echo 'Environment variables not set yet'"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^6.37.3",
+    "@upstash/redis": "^1.36.2",
+    "clsx": "^2.1.1",
+    "dotenv": "^17.2.4",
+    "drizzle-kit": "^0.31.9",
+    "drizzle-orm": "^0.45.1",
+    "next": "^14.2.0",
+    "openai": "^4.104.0",
+    "postgres": "^3.4.8",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "svix": "^1.84.1",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.0",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^14.2.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.5.0"
+  }
+}
