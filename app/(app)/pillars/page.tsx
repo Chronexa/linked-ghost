@@ -1,55 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea, Badge } from '@/components/ui';
-
-// Mock data
-const mockPillars = [
-  {
-    id: '1',
-    name: 'AI Innovation',
-    slug: 'ai_innovation',
-    description: 'Latest trends and breakthroughs in artificial intelligence',
-    tone: 'forward-thinking, analytical, optimistic',
-    targetAudience: 'Tech leaders, AI enthusiasts, startup founders',
-    status: 'active' as const,
-    postsCount: 12,
-    createdAt: '2026-01-15T10:00:00Z',
-  },
-  {
-    id: '2',
-    name: 'Leadership',
-    slug: 'leadership',
-    description: 'Team management, culture building, and leadership insights',
-    tone: 'authentic, empathetic, actionable',
-    targetAudience: 'Managers, executives, aspiring leaders',
-    status: 'active' as const,
-    postsCount: 8,
-    createdAt: '2026-01-15T10:05:00Z',
-  },
-  {
-    id: '3',
-    name: 'Productivity',
-    slug: 'productivity',
-    description: 'Tools, techniques, and strategies for working smarter',
-    tone: 'practical, data-driven, encouraging',
-    targetAudience: 'Knowledge workers, entrepreneurs, productivity enthusiasts',
-    status: 'active' as const,
-    postsCount: 15,
-    createdAt: '2026-01-15T10:10:00Z',
-  },
-  {
-    id: '4',
-    name: 'Founder Journey',
-    slug: 'founder_journey',
-    description: 'Personal stories and lessons from building a startup',
-    tone: 'vulnerable, honest, inspiring',
-    targetAudience: 'Entrepreneurs, startup founders, aspiring founders',
-    status: 'inactive' as const,
-    postsCount: 3,
-    createdAt: '2026-01-20T14:00:00Z',
-  },
-];
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Input,
+  Textarea,
+  Badge,
+} from '@/components/ui';
+import {
+  usePillars,
+  useCreatePillar,
+  useUpdatePillar,
+  useDeletePillar,
+} from '@/lib/hooks/use-pillars';
 
 export default function PillarsPage() {
   const [showForm, setShowForm] = useState(false);
@@ -61,14 +28,36 @@ export default function PillarsPage() {
     targetAudience: '',
   });
 
+  // Fetch pillars from API
+  const { data: pillarsData, isLoading } = usePillars({});
+  const createPillar = useCreatePillar();
+  const updatePillar = useUpdatePillar();
+  const deletePillar = useDeletePillar();
+
+  const pillars = pillarsData?.data?.data || [];
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Creating pillar:', formData);
-    setShowForm(false);
-    setFormData({ name: '', description: '', tone: '', targetAudience: '' });
+
+    try {
+      if (editingId) {
+        await updatePillar.mutateAsync({
+          id: editingId,
+          data: formData,
+        });
+      } else {
+        await createPillar.mutateAsync(formData);
+      }
+
+      setShowForm(false);
+      setEditingId(null);
+      setFormData({ name: '', description: '', tone: '', targetAudience: '' });
+    } catch (error) {
+      // Error handled by hooks
+    }
   };
 
-  const handleEdit = (pillar: typeof mockPillars[0]) => {
+  const handleEdit = (pillar: any) => {
     setEditingId(pillar.id);
     setFormData({
       name: pillar.name,
@@ -79,8 +68,26 @@ export default function PillarsPage() {
     setShowForm(true);
   };
 
-  const handleToggleStatus = (id: string) => {
-    console.log('Toggle status for:', id);
+  const handleToggleStatus = async (pillar: any) => {
+    const newStatus = pillar.status === 'active' ? 'inactive' : 'active';
+    try {
+      await updatePillar.mutateAsync({
+        id: pillar.id,
+        data: { status: newStatus },
+      });
+    } catch (error) {
+      // Error handled by hooks
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure you want to delete this pillar? This action cannot be undone.')) {
+      try {
+        await deletePillar.mutateAsync(id);
+      } catch (error) {
+        // Error handled by hooks
+      }
+    }
   };
 
   return (
@@ -89,9 +96,7 @@ export default function PillarsPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="font-display text-3xl font-bold text-charcoal">Content Pillars</h1>
-          <p className="text-charcoal-light mt-1">
-            Organize your content by themes and topics
-          </p>
+          <p className="text-charcoal-light mt-1">Organize your content by themes and topics</p>
         </div>
         <Button
           onClick={() => {
@@ -146,14 +151,17 @@ export default function PillarsPage() {
               />
 
               <div className="flex items-center space-x-3 pt-4">
-                <Button type="submit">
-                  {editingId ? 'Update Pillar' : 'Create Pillar'}
-                </Button>
                 <Button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  variant="secondary"
+                  type="submit"
+                  disabled={createPillar.isPending || updatePillar.isPending}
                 >
+                  {createPillar.isPending || updatePillar.isPending
+                    ? 'Saving...'
+                    : editingId
+                    ? 'Update Pillar'
+                    : 'Create Pillar'}
+                </Button>
+                <Button type="button" onClick={() => setShowForm(false)} variant="secondary">
                   Cancel
                 </Button>
               </div>
@@ -162,71 +170,113 @@ export default function PillarsPage() {
         </Card>
       )}
 
+      {/* Loading State */}
+      {isLoading && (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <p className="text-charcoal-light">Loading pillars...</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Pillars Grid */}
-      <div className="grid md:grid-cols-2 gap-6">
-        {mockPillars.map((pillar) => (
-          <Card key={pillar.id} hover>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <CardTitle className="text-lg">{pillar.name}</CardTitle>
-                  <Badge variant={pillar.status === 'active' ? 'success' : 'neutral'}>
-                    {pillar.status}
-                  </Badge>
+      {!isLoading && pillars.length > 0 && (
+        <div className="grid md:grid-cols-2 gap-6">
+          {pillars.map((pillar: any) => (
+            <Card key={pillar.id} hover>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <CardTitle className="text-lg">{pillar.name}</CardTitle>
+                    <Badge variant={pillar.status === 'active' ? 'success' : 'neutral'}>
+                      {pillar.status}
+                    </Badge>
+                  </div>
                 </div>
-              </div>
-              {pillar.description && (
-                <p className="text-charcoal-light text-sm mt-2">{pillar.description}</p>
-              )}
-            </CardHeader>
-            <CardContent>
-              {pillar.tone && (
-                <div className="mb-3">
-                  <label className="text-xs font-medium text-charcoal-light">Tone:</label>
-                  <p className="text-sm text-charcoal mt-1">{pillar.tone}</p>
-                </div>
-              )}
+                {pillar.description && (
+                  <p className="text-charcoal-light text-sm mt-2">{pillar.description}</p>
+                )}
+              </CardHeader>
+              <CardContent>
+                {pillar.tone && (
+                  <div className="mb-3">
+                    <label className="text-xs font-medium text-charcoal-light">Tone:</label>
+                    <p className="text-sm text-charcoal mt-1">{pillar.tone}</p>
+                  </div>
+                )}
 
-              {pillar.targetAudience && (
-                <div className="mb-4">
-                  <label className="text-xs font-medium text-charcoal-light">Target Audience:</label>
-                  <p className="text-sm text-charcoal mt-1">{pillar.targetAudience}</p>
-                </div>
-              )}
+                {pillar.targetAudience && (
+                  <div className="mb-4">
+                    <label className="text-xs font-medium text-charcoal-light">
+                      Target Audience:
+                    </label>
+                    <p className="text-sm text-charcoal mt-1">{pillar.targetAudience}</p>
+                  </div>
+                )}
 
-              <div className="flex items-center justify-between pt-4 border-t border-border">
-                <div className="text-sm text-charcoal-light">
-                  <span className="font-semibold text-charcoal">{pillar.postsCount}</span> posts
+                <div className="flex items-center justify-between pt-4 border-t border-border">
+                  <div className="text-sm text-charcoal-light">
+                    <span className="font-semibold text-charcoal">{pillar.postsCount || 0}</span>{' '}
+                    posts
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleToggleStatus(pillar)}
+                      className="p-2 text-charcoal-light hover:text-success hover:bg-success/5 rounded transition"
+                      title={pillar.status === 'active' ? 'Deactivate' : 'Activate'}
+                      aria-label={
+                        pillar.status === 'active' ? 'Deactivate pillar' : 'Activate pillar'
+                      }
+                      disabled={updatePillar.isPending}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 10V3L4 14h7v7l9-11h-7z"
+                        />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleEdit(pillar)}
+                      className="p-2 text-charcoal-light hover:text-brand hover:bg-brand/5 rounded transition"
+                      aria-label="Edit pillar"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                        />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleDelete(pillar.id)}
+                      className="p-2 text-charcoal-light hover:text-error hover:bg-error/5 rounded transition"
+                      aria-label="Delete pillar"
+                      disabled={deletePillar.isPending}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleToggleStatus(pillar.id)}
-                    className="p-2 text-charcoal-light hover:text-success hover:bg-success/5 rounded transition"
-                    title={pillar.status === 'active' ? 'Deactivate' : 'Activate'}
-                    aria-label={pillar.status === 'active' ? 'Deactivate pillar' : 'Activate pillar'}
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => handleEdit(pillar)}
-                    className="p-2 text-charcoal-light hover:text-brand hover:bg-brand/5 rounded transition"
-                    aria-label="Edit pillar"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Empty State */}
-      {mockPillars.length === 0 && (
+      {!isLoading && pillars.length === 0 && (
         <Card className="border-2 border-dashed">
           <CardContent className="p-12 text-center">
             <svg
@@ -246,9 +296,7 @@ export default function PillarsPage() {
             <p className="text-charcoal-light text-sm mb-6">
               Create your first content pillar to start organizing your posts
             </p>
-            <Button onClick={() => setShowForm(true)}>
-              Create Your First Pillar
-            </Button>
+            <Button onClick={() => setShowForm(true)}>Create Your First Pillar</Button>
           </CardContent>
         </Card>
       )}

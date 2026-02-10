@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from '@clerk/nextjs';
 import { Space_Grotesk, Inter } from 'next/font/google';
+import { Providers } from '@/lib/providers';
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -86,7 +87,9 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
-          {children}
+          <Providers>
+            {children}
+          </Providers>
         </body>
       </html>
     </ClerkProvider>

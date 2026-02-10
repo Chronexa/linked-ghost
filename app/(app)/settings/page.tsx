@@ -1,20 +1,37 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui';
+import { useUser, useUpdateProfile, useSubscription } from '@/lib/hooks/use-user';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'account' | 'sources' | 'billing'>('account');
-  const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch user data from APIs
+  const { data: userData } = useUser();
+  const { data: subscriptionData } = useSubscription();
+  const updateProfile = useUpdateProfile();
 
   // Account settings state
   const [accountData, setAccountData] = useState({
-    name: 'John Doe',
-    email: 'john@example.com',
-    linkedinUrl: 'linkedin.com/in/johndoe',
+    linkedinUrl: '',
+    targetAudience: '',
+    writingStyle: '',
   });
 
-  // Sources settings state
+  // Initialize form with user data
+  useEffect(() => {
+    if (userData?.data?.profile) {
+      const profile = userData.data.profile;
+      setAccountData({
+        linkedinUrl: profile.linkedinUrl || '',
+        targetAudience: profile.targetAudience || '',
+        writingStyle: profile.writingStyle || '',
+      });
+    }
+  }, [userData]);
+
+  // Sources settings state (client-side only for now)
   const [sourcesData, setSourcesData] = useState({
     perplexityEnabled: true,
     redditEnabled: true,
@@ -24,24 +41,29 @@ export default function SettingsPage() {
 
   const handleSaveAccount = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaving(true);
-    setTimeout(() => setIsSaving(false), 1000);
+    try {
+      await updateProfile.mutateAsync(accountData);
+    } catch (error) {
+      // Error handled by hook
+    }
   };
 
   const handleSaveSources = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaving(true);
-    setTimeout(() => setIsSaving(false), 1000);
+    // TODO: Implement sources API when backend is ready
+    console.log('Saving sources:', sourcesData);
   };
+
+  const user = userData?.data?.user;
+  const profile = userData?.data?.profile;
+  const subscription = subscriptionData?.data;
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="font-display text-3xl font-bold text-charcoal">Settings</h1>
-        <p className="text-charcoal-light mt-1">
-          Manage your account and preferences
-        </p>
+        <p className="text-charcoal-light mt-1">Manage your account and preferences</p>
       </div>
 
       <div className="grid lg:grid-cols-4 gap-6">
@@ -95,22 +117,23 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSaveAccount} className="space-y-6">
-                  <Input
-                    label="Full Name"
-                    type="text"
-                    value={accountData.name}
-                    onChange={(e) => setAccountData({ ...accountData, name: e.target.value })}
-                    placeholder="John Doe"
-                  />
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-charcoal mb-2">
+                      Full Name
+                    </label>
+                    <div className="text-charcoal-light">{user?.fullName || 'Not set'}</div>
+                    <p className="text-xs text-charcoal-light mt-1">
+                      Managed by your authentication provider
+                    </p>
+                  </div>
 
-                  <Input
-                    label="Email"
-                    type="email"
-                    value={accountData.email}
-                    onChange={(e) => setAccountData({ ...accountData, email: e.target.value })}
-                    placeholder="john@example.com"
-                    helperText="We'll never share your email with anyone"
-                  />
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-charcoal mb-2">Email</label>
+                    <div className="text-charcoal-light">{user?.email || 'Not set'}</div>
+                    <p className="text-xs text-charcoal-light mt-1">
+                      Managed by your authentication provider
+                    </p>
+                  </div>
 
                   <Input
                     label="LinkedIn Profile URL"
@@ -119,27 +142,59 @@ export default function SettingsPage() {
                     onChange={(e) =>
                       setAccountData({ ...accountData, linkedinUrl: e.target.value })
                     }
-                    placeholder="linkedin.com/in/johndoe"
+                    placeholder="linkedin.com/in/yourprofile"
                     helperText="Your public LinkedIn profile URL"
                   />
+
+                  <Input
+                    label="Target Audience"
+                    type="text"
+                    value={accountData.targetAudience}
+                    onChange={(e) =>
+                      setAccountData({ ...accountData, targetAudience: e.target.value })
+                    }
+                    placeholder="e.g., Tech founders, marketing professionals"
+                    helperText="Who are you writing for?"
+                  />
+
+                  <Input
+                    label="Writing Style"
+                    type="text"
+                    value={accountData.writingStyle}
+                    onChange={(e) =>
+                      setAccountData({ ...accountData, writingStyle: e.target.value })
+                    }
+                    placeholder="e.g., casual, professional, thought-leader"
+                    helperText="Your preferred writing tone"
+                  />
+
+                  {profile && (
+                    <div className="p-4 bg-background rounded-lg">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <label className="text-charcoal-light">Voice Confidence</label>
+                          <p className="font-semibold text-charcoal">
+                            {profile.voiceConfidenceScore}%
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-charcoal-light">Pillars Created</label>
+                          <p className="font-semibold text-charcoal">{user?.pillarsCount || 0}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="pt-4">
                     <Button
                       type="submit"
-                      isLoading={isSaving}
+                      isLoading={updateProfile.isPending}
                       loadingText="Saving..."
                     >
                       Save Changes
                     </Button>
                   </div>
                 </form>
-
-                <div className="mt-8 pt-8 border-t border-border">
-                  <h3 className="font-semibold text-charcoal mb-4">Danger Zone</h3>
-                  <Button variant="secondary" className="border-error text-error hover:bg-error/5">
-                    Delete Account
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           )}
@@ -177,53 +232,11 @@ export default function SettingsPage() {
                       </label>
                     </div>
 
-                    {/* Reddit */}
-                    <div className="p-4 bg-background rounded-lg space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-semibold text-charcoal">Reddit</h4>
-                          <p className="text-sm text-charcoal-light">
-                            Monitor Reddit discussions by keywords
-                          </p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={sourcesData.redditEnabled}
-                            onChange={(e) =>
-                              setSourcesData({
-                                ...sourcesData,
-                                redditEnabled: e.target.checked,
-                              })
-                            }
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-border rounded-full peer peer-checked:bg-brand after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full" />
-                        </label>
-                      </div>
-                      {sourcesData.redditEnabled && (
-                        <Input
-                          label="Keywords (comma-separated)"
-                          type="text"
-                          value={sourcesData.redditKeywords}
-                          onChange={(e) =>
-                            setSourcesData({
-                              ...sourcesData,
-                              redditKeywords: e.target.value,
-                            })
-                          }
-                          placeholder="AI, startups, productivity"
-                        />
-                      )}
-                    </div>
-
                     {/* Manual */}
                     <div className="flex items-center justify-between p-4 bg-background rounded-lg">
                       <div>
                         <h4 className="font-semibold text-charcoal">Manual Input</h4>
-                        <p className="text-sm text-charcoal-light">
-                          Add topics manually
-                        </p>
+                        <p className="text-sm text-charcoal-light">Add topics manually</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
@@ -243,11 +256,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="pt-4">
-                    <Button
-                      type="submit"
-                      isLoading={isSaving}
-                      loadingText="Saving..."
-                    >
+                    <Button type="submit" loadingText="Saving...">
                       Save Sources
                     </Button>
                   </div>
@@ -268,22 +277,25 @@ export default function SettingsPage() {
                   <div className="p-6 bg-brand/5 border border-brand/20 rounded-lg">
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h3 className="font-display text-2xl font-bold text-charcoal">Growth Plan</h3>
+                        <h3 className="font-display text-2xl font-bold text-charcoal">
+                          {subscription?.planName || 'Free Plan'}
+                        </h3>
                         <p className="text-charcoal-light mt-1">
-                          $79/month • 30 posts • 5 pillars
+                          {subscription?.status || 'Active'}
                         </p>
                       </div>
-                      <div className="text-right">
-                        <div className="text-3xl font-bold text-brand">$79</div>
-                        <div className="text-xs text-charcoal-light">per month</div>
-                      </div>
+                      {subscription?.monthlyPostLimit && (
+                        <div className="text-right">
+                          <div className="text-3xl font-bold text-brand">
+                            {subscription.monthlyPostLimit}
+                          </div>
+                          <div className="text-xs text-charcoal-light">posts/month</div>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center space-x-3">
                       <Button variant="secondary" size="sm">
-                        Change Plan
-                      </Button>
-                      <Button variant="secondary" size="sm" className="border-error text-error hover:bg-error/5">
-                        Cancel Subscription
+                        Manage Subscription
                       </Button>
                     </div>
                   </div>
@@ -294,41 +306,26 @@ export default function SettingsPage() {
                     <div className="space-y-3">
                       <div>
                         <div className="flex items-center justify-between text-sm mb-1">
-                          <span className="text-charcoal-light">Posts this month</span>
-                          <span className="font-semibold text-charcoal">12 / 30</span>
-                        </div>
-                        <div className="bg-border rounded-full h-2 overflow-hidden">
-                          <div className="bg-brand h-full rounded-full" style={{ width: '40%' }} />
+                          <span className="text-charcoal-light">Active pillars</span>
+                          <span className="font-semibold text-charcoal">
+                            {user?.pillarsCount || 0}
+                          </span>
                         </div>
                       </div>
                       <div>
                         <div className="flex items-center justify-between text-sm mb-1">
-                          <span className="text-charcoal-light">Active pillars</span>
-                          <span className="font-semibold text-charcoal">3 / 5</span>
+                          <span className="text-charcoal-light">Voice confidence</span>
+                          <span className="font-semibold text-charcoal">
+                            {profile?.voiceConfidenceScore || 0}%
+                          </span>
                         </div>
                         <div className="bg-border rounded-full h-2 overflow-hidden">
-                          <div className="bg-success h-full rounded-full" style={{ width: '60%' }} />
+                          <div
+                            className="bg-brand h-full rounded-full"
+                            style={{ width: `${profile?.voiceConfidenceScore || 0}%` }}
+                          />
                         </div>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Payment Method */}
-                  <div>
-                    <h4 className="font-semibold text-charcoal mb-3">Payment Method</h4>
-                    <div className="p-4 bg-background rounded-lg flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-12 h-8 bg-charcoal rounded flex items-center justify-center text-white text-xs font-bold">
-                          VISA
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-charcoal">•••• 4242</p>
-                          <p className="text-xs text-charcoal-light">Expires 12/25</p>
-                        </div>
-                      </div>
-                      <Button variant="secondary" size="sm">
-                        Update
-                      </Button>
                     </div>
                   </div>
                 </div>

@@ -20,7 +20,9 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6.37.3",
+    "@tanstack/react-query": "^5.90.20",
     "@upstash/redis": "^1.36.2",
+    "axios": "^1.13.5",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.4",
     "drizzle-kit": "^0.31.9",
@@ -30,6 +32,7 @@
     "postgres": "^3.4.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-hot-toast": "^2.6.0",
     "svix": "^1.84.1",
     "tailwind-merge": "^3.4.0",
     "zod": "^3.25.76"
