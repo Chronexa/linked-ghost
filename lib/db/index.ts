@@ -29,13 +29,15 @@ function getDb() {
 }
 
 // Export a proxy that lazily initializes the db
-export const db = new Proxy({} as ReturnType<typeof drizzle>, {
+type DrizzleDB = ReturnType<typeof drizzle<typeof schema>>;
+
+export const db = new Proxy({} as DrizzleDB, {
   get(target, prop) {
     const database = getDb();
     const value = (database as any)[prop];
     return typeof value === 'function' ? value.bind(database) : value;
   }
-});
+}) as DrizzleDB;
 
 // Export schema for easy access
 export { schema };
