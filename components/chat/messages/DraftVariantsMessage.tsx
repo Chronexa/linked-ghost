@@ -40,6 +40,10 @@ export function DraftVariantsMessage({ drafts, onRegenerate, onSelect, onSave, i
 
     const currentDraft = drafts.find(d => d.variantLetter === activeTab) || drafts[0];
 
+    if (!currentDraft) {
+        return null;
+    }
+
     const getDisplayText = (draft: Draft) => savedOverrides[draft.id] ?? draft.fullText;
 
     const handleCopy = (text: string) => {
