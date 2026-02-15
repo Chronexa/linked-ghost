@@ -60,6 +60,22 @@ export function ChatInterface({ conversationId, initialTrigger }: ChatInterfaceP
         }
     }, [messages, isSending]);
 
+    // Polling for async generation
+    useEffect(() => {
+        const lastMessage = messages[messages.length - 1];
+        // Check for specific processing flag we added in the API
+        const isProcessing = lastMessage?.metadata?.status === 'processing' ||
+            lastMessage?.metadata?.type === 'draft_generation_in_progress';
+
+        if (isProcessing && !loadingMessages) {
+            const interval = setInterval(() => {
+                refetch();
+            }, 3000); // Poll every 3 seconds
+
+            return () => clearInterval(interval);
+        }
+    }, [messages, loadingMessages, refetch]);
+
     const handleSend = async (content: string) => {
         // Optimistic update
         const tempId = Date.now().toString();

@@ -6,8 +6,8 @@ import { db } from '@/lib/db';
 import { conversationMessages, conversations, classifiedTopics, generatedDrafts, voiceExamples, pillars, profiles } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
-import { generateDraftVariants, estimateEngagement } from '@/lib/ai/generation';
-import { retry, isRetryableError } from '@/lib/utils/retry';
+import { estimateEngagement } from '@/lib/ai/generation';
+import { enqueueGeneration } from '@/lib/queue';
 import { checkUsageLimit, incrementUsage } from '@/lib/ai/usage';
 
 // Research topics use PerplexitySource { title, url, snippet }; accept either name or title
@@ -142,105 +142,61 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
             return errors.rateLimit(`Usage limit reached for your ${usageCheck.plan} plan.`);
         }
 
-        // 4. Generate Drafts
-        const genResult = await retry(
-            () => generateDraftVariants({
-                topicTitle: topicContent,
-                topicDescription: sources?.map((s: any) => s.snippet).join('\n') || undefined,
-                userPerspective: userPerspective || "Write an engaging LinkedIn post about this topic.",
-                pillarName: pillar.name,
-                pillarDescription: pillar.description || undefined,
-                pillarTone: pillar.tone || undefined,
-                targetAudience: pillar.targetAudience || profile?.targetAudience || undefined,
-                customPrompt: pillar.customPrompt || undefined,
-                voiceExamples: examples.map((ex) => ({
-                    postText: ex.postText,
-                    embedding: ex.embedding as number[] | undefined,
-                })),
-                masterVoiceEmbedding: (profile?.voiceEmbedding as number[]) || undefined,
-                numVariants: 2,
-                userInstructions: profile?.defaultInstructions ?? undefined,
-                userId: user.id,
-            }),
-            { maxAttempts: 3, delayMs: 1000, exponentialBackoff: true, retryOn: isRetryableError }
-        );
-
-        // 5. Insert Drafts
-        const draftsToInsert = genResult.variants.map((variant: any) => ({
-            userId: user.id,
-            topicId: newTopic.id,
-            pillarId: effectivePillarId!,
-            userPerspective: userPerspective || 'Write an engaging LinkedIn post about this topic.',
-            variantLetter: variant.variantLetter,
-            fullText: variant.post.fullText,
-            hook: variant.post.hook,
-            body: variant.post.body,
-            cta: variant.post.cta,
-            hashtags: variant.post.hashtags,
-            characterCount: variant.post.characterCount,
-            estimatedEngagement: estimateEngagement(variant.post),
-            status: 'draft' as const,
-        }));
-
-        const createdDrafts = await db.insert(generatedDrafts).values(draftsToInsert).returning();
-
-        // Increment usage
-        await incrementUsage(user.id, 'generate_post', 2);
-
-        // 6. Save User & Assistant Messages
-        // If perspective was provided in this step, log it as user message logic
-        // Actually, if we came here via "userPerspective" param, we should record that user input
-        // The previous step might have been just "select topic", so we need a new user message for the perspective
-        if (userPerspective) {
-            await db.insert(conversationMessages).values({
-                conversationId,
-                userId: user.id,
-                role: 'user',
-                content: userPerspective,
-                messageType: 'text',
-            });
-        } else if (skipPerspective) {
-            await db.insert(conversationMessages).values({
-                conversationId,
-                userId: user.id,
-                role: 'user',
-                content: "Skipped perspective (clicked 'Use Default Angle')",
-                messageType: 'text',
-            });
-        } else {
-            // If we came here directly (skipPerspective implied or just one-shot),
-            // we might want to log "Selected topic..." if it wasn't logged in Case 1.
-            // But the Logic splits: verify if this is a follow-up or first-time
-            // Assuming this endpoint is called either 1) to Select (Case 1) or 2) to Confirm (Case 2)
-            // If userPerspective/skip is provided, it's likely a follow-up.
-            // We'll trust the client to call effectively.
-        }
-
+        // 4. Enqueue Generation Job (Async)
+        // Create a placeholder message first
         const [assistantDraftMessage] = await db.insert(conversationMessages).values({
             conversationId,
             userId: user.id,
             role: 'assistant',
-            content: `I've drafted two posts for you about "${topicContent}".`,
-            messageType: 'draft_variants',
+            content: `I'm drafting potential posts for you about "${topicContent}". This may take a minute...`,
+            messageType: 'text',
             metadata: {
-                drafts: createdDrafts.map((d, i) => ({
-                    ...d,
-                    style: genResult.variants[i].style,
-                    voiceMatchScore: genResult.variants[i].voiceMatchScore,
-                    qualityWarnings: genResult.variants[i].qualityWarnings
-                }))
+                topicContent,
+                topicId: newTopic.id,
+                pillarId: effectivePillarId,
+                status: 'processing',
+                type: 'draft_generation_in_progress'
             }
         }).returning();
 
+        // Enqueue the heavy lifting
+        await enqueueGeneration({
+            userId: user.id,
+            conversationId,
+            messageId: assistantDraftMessage.id,
+            topicId: newTopic.id,
+            pillarId: effectivePillarId!,
+            pillarContext: {
+                name: pillar.name,
+                description: pillar.description || undefined,
+                tone: pillar.tone || undefined,
+                targetAudience: pillar.targetAudience || profile?.targetAudience || undefined,
+                customPrompt: pillar.customPrompt || undefined,
+            },
+            topicContent: {
+                title: topicContent,
+                summary: sources?.map((s: any) => s.snippet).join('\n') || undefined,
+            },
+            userPerspective: userPerspective || "Write an engaging LinkedIn post about this topic.",
+            voiceExamples: examples.map((ex) => ({
+                postText: ex.postText,
+                embedding: ex.embedding, // Pass embedding if available, otherwise worker might need to re-fetch or generate? Worker has logic.
+            })),
+        });
+
+        // Increment usage (we assume success or handle refund in worker on failure?)
+        // Better to increment here to prevent abuse.
+        await incrementUsage(user.id, 'generate_post', 2);
+
         // Update conversation
         await db.update(conversations).set({
-            lastMessagePreview: `Generated drafts for "${topicContent}"`,
+            lastMessagePreview: `Generating drafts for "${topicContent}"...`,
             updatedAt: new Date()
         }).where(eq(conversations.id, conversationId));
 
-        return responses.created({
-            drafts: createdDrafts,
-            messageId: assistantDraftMessage.id
+        return responses.accepted({
+            messageId: assistantDraftMessage.id,
+            status: 'processing'
         });
 
     } catch (error) {
