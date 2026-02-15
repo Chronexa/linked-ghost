@@ -167,7 +167,7 @@ export async function generateDraftVariants(params: {
     customPrompt,
     voiceExamples,
     masterVoiceEmbedding,
-    numVariants = 3,
+    numVariants = 1,
     userInstructions,
     userId,
   } = params;
@@ -235,6 +235,7 @@ export async function generateDraftVariants(params: {
       topicDescription,
       userPerspective,
       voiceExamples,
+      numVariants,
     });
   }
 
@@ -342,7 +343,7 @@ export function buildSystemPrompt(params: {
   numVariants?: number;
   authorContext?: string;
 }): string {
-  const { pillarName, pillarDescription, pillarTone, targetAudience, customPrompt, numVariants = 3, authorContext = '' } = params;
+  const { pillarName, pillarDescription, pillarTone, targetAudience, customPrompt, numVariants = 1, authorContext = '' } = params;
 
   // Build pillar context string
   const contextParts = [];
@@ -371,8 +372,9 @@ function buildUserPrompt(params: {
   topicDescription?: string;
   userPerspective: string;
   voiceExamples: VoiceExample[];
+  numVariants?: number;
 }): string {
-  const { topicTitle, topicDescription, userPerspective, voiceExamples } = params;
+  const { topicTitle, topicDescription, userPerspective, voiceExamples, numVariants = 1 } = params;
 
   // Select best voice examples (max 3 for context window)
   const selectedExamples = voiceExamples.slice(0, 3);
@@ -392,7 +394,8 @@ function buildUserPrompt(params: {
   const basePrompt = interpolate(GENERATION_PROMPTS.userPrompt.base, {
     topicTitle,
     topicDescription: descriptionText,
-    voiceExamples: examplesText
+    voiceExamples: examplesText,
+    numVariants,
   });
 
   // Add user perspective to the prompt
