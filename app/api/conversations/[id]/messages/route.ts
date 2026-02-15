@@ -7,6 +7,8 @@ import { conversationMessages, conversations } from '@/lib/db/schema';
 import { eq, and, asc } from 'drizzle-orm';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
 // Validation schema for creating a message
 const createMessageSchema = z.object({
     content: z.string().min(1, 'Content is required'),

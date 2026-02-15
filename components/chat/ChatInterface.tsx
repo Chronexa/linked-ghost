@@ -69,7 +69,7 @@ export function ChatInterface({ conversationId, initialTrigger }: ChatInterfaceP
 
         if (isProcessing && !loadingMessages) {
             const interval = setInterval(() => {
-                refetch();
+                refetch({ skipLoading: true });
             }, 3000); // Poll every 3 seconds
 
             return () => clearInterval(interval);

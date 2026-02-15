@@ -40,10 +40,10 @@ export function useConversation(id: string | null) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<Error | null>(null);
 
-    const fetchMessages = useCallback(async () => {
+    const fetchMessages = useCallback(async (options?: { skipLoading?: boolean }) => {
         if (!id) return;
         try {
-            setLoading(true);
+            if (!options?.skipLoading) setLoading(true);
             const res = await fetch(`/api/conversations/${id}/messages`);
             if (!res.ok) throw new Error('Failed to fetch messages');
             const data = await res.json();
@@ -51,7 +51,7 @@ export function useConversation(id: string | null) {
         } catch (err) {
             setError(err as Error);
         } finally {
-            setLoading(false);
+            if (!options?.skipLoading) setLoading(false);
         }
     }, [id]);
 
