@@ -13,28 +13,61 @@ const config: Config = {
         display: ['var(--font-space-grotesk)', 'system-ui', 'sans-serif'],
       },
       colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+        // Legacy/Semantic mapping
         brand: {
-          DEFAULT: '#C1502E',
-          light: '#E07A5F',
-          dark: '#A13D22',
-          text: '#B3401A',
+          DEFAULT: "hsl(var(--brand))",
+          light: "hsl(var(--brand-light))",
+          dark: "hsl(var(--brand-dark))",
+          text: "hsl(var(--brand))",
         },
         success: {
-          DEFAULT: '#52B788',
-          dark: '#6B8E23',
+          DEFAULT: "hsl(var(--success))",
+          dark: "hsl(var(--success))",
         },
-        warning: '#F97316',
-        error: '#DC2626',
-        background: '#FFFCF2',
-        surface: '#FFFFFF',
+        warning: "hsl(var(--warning))",
+        surface: "hsl(var(--card))",
         charcoal: {
-          DEFAULT: '#1A1A1D',
-          light: '#52525B',
+          DEFAULT: "hsl(var(--foreground))",
+          light: "hsl(var(--muted-foreground))",
         },
-        border: {
-          DEFAULT: '#E8E2D8',
-          subtle: '#F5F0E8',
-        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
       },
       boxShadow: {
         'warm': '0 2px 8px rgba(193, 80, 46, 0.08)',
@@ -43,6 +76,9 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    require("tailwindcss-animate"),
+    require("@tailwindcss/typography"),
+  ],
 };
 export default config;

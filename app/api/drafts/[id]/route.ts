@@ -15,8 +15,9 @@ import { generatedDrafts, classifiedTopics, pillars } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 
-// Validation schema
+// Validation schema – accept both fullText (client) and editedText; both map to editedText in DB
 const updateDraftSchema = z.object({
+  fullText: z.string().min(50).max(3000).optional(),
   editedText: z.string().min(50).max(3000).optional(),
   feedbackNotes: z.string().max(1000).optional(),
   status: z.enum(['draft', 'approved', 'rejected']).optional(),
@@ -96,21 +97,23 @@ export const PATCH = withAuth(async (req: NextRequest, { params, user }) => {
       return errors.notFound('Draft');
     }
 
-    // Prepare update data
-    const updateData: any = {
-      ...data,
+    // Prepare update data – only set fields that belong on the table; map fullText → editedText
+    const updateData: Record<string, unknown> = {
       updatedAt: new Date(),
     };
+    if (data.feedbackNotes !== undefined) updateData.feedbackNotes = data.feedbackNotes;
+    if (data.status !== undefined) updateData.status = data.status;
 
-    // Update character count if text changed
-    if (data.editedText) {
-      updateData.characterCount = data.editedText.length;
+    const editedContent = data.fullText ?? data.editedText;
+    if (editedContent !== undefined) {
+      updateData.editedText = editedContent;
+      updateData.characterCount = editedContent.length;
     }
 
     // Update draft
     const [updatedDraft] = await db
       .update(generatedDrafts)
-      .set(updateData)
+      .set(updateData as Partial<typeof generatedDrafts.$inferInsert>)
       .where(eq(generatedDrafts.id, id))
       .returning();
 

@@ -1,10 +1,15 @@
 /**
  * Content Generation Utilities
  * Generate LinkedIn posts using GPT-4o with voice matching
+ * Uses prompt store when available; falls back to in-code builders.
  */
 
 import { openai, OPENAI_MODELS, DEFAULT_CONFIG } from './openai';
 import { generateEmbedding, cosineSimilarity } from './embeddings';
+import { getPrompt, PROMPT_KEYS } from '@/lib/prompts/store';
+import { db } from '@/lib/db';
+import { profiles } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 /**
  * Structure of a LinkedIn post
@@ -20,13 +25,14 @@ export interface LinkedInPost {
 }
 
 /**
- * Draft variant with voice match score
+ * Draft variant with voice match score and optional quality warnings
  */
 export interface DraftVariant {
   variantLetter: 'A' | 'B' | 'C';
   post: LinkedInPost;
   voiceMatchScore: number; // 0-100, how well it matches user's voice
   style: string; // "narrative" | "analytical" | "conversational"
+  qualityWarnings?: string[]; // from validatePost() when invalid
 }
 
 /**
@@ -45,20 +51,98 @@ export interface GenerationResult {
   };
 }
 
-/**
- * Voice example for prompt context
- */
 interface VoiceExample {
   postText: string;
   embedding?: number[];
 }
 
+interface AuthorContextConfig {
+  profile: any | null; // Typed as 'any' locally to avoid circular deps, effectively typeof profiles.$inferSelect
+  mode: 'full' | 'minimal' | 'none';
+}
+
 /**
- * Generate 3 LinkedIn post variants from a topic
+ * Build Author Context String
+ * Converts raw profile data into a rich persona definition for the AI.
+ */
+export function buildAuthorContext(config: AuthorContextConfig): string {
+  const { profile, mode } = config;
+
+  if (mode === 'none' || !profile) {
+    return '';
+  }
+
+  // extract fields with fallbacks
+  const role = profile.currentRole || 'Professional';
+  const industry = profile.industry || 'Business';
+  const years = profile.yearsOfExperience || 'several';
+  const expertise = Array.isArray(profile.keyExpertise) ? profile.keyExpertise : [];
+  const angle = profile.uniqueAngle || '';
+
+  // Calculate seniority/credibility level
+  let seniorityLevel = 'mid-level';
+  let yearsNum = 0;
+
+  if (typeof years === 'string') {
+    if (years.includes('15+')) yearsNum = 15;
+    else if (years.includes('11-15')) yearsNum = 12;
+    else if (years.includes('6-10')) yearsNum = 8;
+    else if (years.includes('3-5')) yearsNum = 4;
+    else yearsNum = 1;
+  }
+
+  if (yearsNum >= 10) seniorityLevel = 'expert veteran';
+  else if (yearsNum >= 5) seniorityLevel = 'experienced practitioner';
+  else seniorityLevel = 'emerging professional';
+
+  // Industry-specific terminology injection (Simple map for now, can be expanded)
+  let industryTerms = '';
+  const indLower = industry.toLowerCase();
+  if (indLower.includes('saas') || indLower.includes('software')) {
+    industryTerms = 'Use SaaS metrics like ARR, CAC, LTV, and Churn where appropriate. Focus on growth, scale, and product-market fit.';
+  } else if (indLower.includes('marketing')) {
+    industryTerms = 'Focus on ROI, brand equity, conversion rates, and audience segmentation.';
+  } else if (indLower.includes('healthcare')) {
+    industryTerms = 'Prioritize patient outcomes, compliance, and operational efficiency.';
+  }
+
+  let context = `**AUTHOR IDENTITY**\n`;
+  context += `You are ghostwriting for a ${role} with ${years} years of experience in ${industry}. `;
+
+  if (seniorityLevel === 'expert veteran') {
+    context += `They are an authoritative voice in the industry. `;
+  } else {
+    context += `They are sharing their journey and learnings. `;
+  }
+
+  if (expertise.length > 0) {
+    context += `\nTheir core expertise covering: ${expertise.join(', ')}. `;
+    context += `\n\n**MANDATORY EXPERTISE INJECTION**\n`;
+    context += `You must subtly weave in the following expertise areas to establish authority: ${expertise.join(', ')}.\n`;
+  }
+
+  if (angle) {
+    context += `\nUnique Perspective: "${angle}"`;
+  }
+
+  context += `\n\n**CREDIBILITY CONSTRAINTS**\n`;
+  context += `- Frame insights through the lens of a ${seniorityLevel}.\n`;
+  if (industryTerms) {
+    context += `- ${industryTerms}\n`;
+  }
+  context += `- Avoid generic advice; be specific to the ${industry} context.\n`;
+  context += `- Use specialized terminology from the user's expertise where natural.\n`;
+
+  return context;
+}
+
+/**
+ * Generate 2-3 LinkedIn post variants from a topic with user perspective
  */
 export async function generateDraftVariants(params: {
   topicTitle: string;
   topicDescription?: string;
+  userPerspective: string;
   pillarName: string;
   pillarDescription?: string;
   pillarTone?: string;
@@ -66,12 +150,16 @@ export async function generateDraftVariants(params: {
   customPrompt?: string;
   voiceExamples: VoiceExample[];
   masterVoiceEmbedding?: number[];
+  numVariants?: number;
+  userInstructions?: string;
+  userId: string; // Added userId to fetch profile
 }): Promise<GenerationResult> {
   const startTime = Date.now();
 
   const {
     topicTitle,
     topicDescription,
+    userPerspective,
     pillarName,
     pillarDescription,
     pillarTone,
@@ -79,22 +167,76 @@ export async function generateDraftVariants(params: {
     customPrompt,
     voiceExamples,
     masterVoiceEmbedding,
+    numVariants = 3,
+    userInstructions,
+    userId,
   } = params;
 
-  // Build the prompt
-  const systemPrompt = buildSystemPrompt({
-    pillarName,
-    pillarDescription,
-    pillarTone,
-    targetAudience,
-    customPrompt,
+  // 1. Fetch Profile Data (Mission Objective 1.3)
+  console.log(`👤 Fetching profile context for user: ${userId}`);
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.userId, userId),
   });
 
-  const userPrompt = buildUserPrompt({
-    topicTitle,
-    topicDescription,
-    voiceExamples,
-  });
+  // Calculate profile completeness for telemetry (Mocking analytics for now)
+  const hasRole = !!profile?.currentRole;
+  const hasIndustry = !!profile?.industry;
+  const hasExpertise = ((profile?.keyExpertise as string[])?.length ?? 0) > 0;
+  const profileScore = [hasRole, hasIndustry, hasExpertise, !!profile?.yearsOfExperience].filter(Boolean).length * 25;
+  console.log(`   Profile Completeness: ${profileScore}%`);
+
+  // 2. Build Author Context (Mission Objective 1.1)
+  // Default to 'full' mode, can be controlled via feature flag later
+  const authorContext = buildAuthorContext({ profile, mode: 'full' });
+
+  const contextParts: string[] = [];
+  if (pillarDescription) contextParts.push(`**DESCRIPTION:** ${pillarDescription}`);
+  if (pillarTone) contextParts.push(`**TONE:** ${pillarTone}`);
+  if (targetAudience) contextParts.push(`**TARGET AUDIENCE:** ${targetAudience}`);
+  if (customPrompt) contextParts.push(`**CUSTOM INSTRUCTIONS:** ${customPrompt}`);
+  const pillarContext = contextParts.join('\n');
+
+  const selectedExamples = voiceExamples.slice(0, 3);
+  const voiceExamplesText = selectedExamples.length > 0
+    ? selectedExamples.map((ex, i) => `Example ${i + 1}:\n${ex.postText}\n\n---\n`).join('\n')
+    : "No specific voice examples provided. Please write in a professional, engaging, and authentic LinkedIn tone. Avoid corporate jargon.";
+  const topicDescriptionText = topicDescription ? `**DESCRIPTION:** ${topicDescription}` : '';
+
+  let systemPrompt: string;
+  let userPrompt: string;
+  try {
+    systemPrompt = await getPrompt(PROMPT_KEYS.DRAFT_SYSTEM, {
+      pillarName,
+      pillarContext,
+      userInstructions: userInstructions ? `\n**USER INSTRUCTIONS:** ${userInstructions}` : '',
+      numVariants,
+      authorContext,
+    });
+    userPrompt = await getPrompt(PROMPT_KEYS.DRAFT_USER, {
+      topicTitle,
+      topicDescription: topicDescriptionText,
+      voiceExamples: voiceExamplesText,
+      userPerspective,
+      numVariants,
+    });
+    if (!systemPrompt.trim() || !userPrompt.trim()) throw new Error('Empty');
+  } catch {
+    systemPrompt = buildSystemPrompt({
+      pillarName,
+      pillarDescription,
+      pillarTone,
+      targetAudience,
+      customPrompt,
+      numVariants,
+      authorContext,
+    });
+    userPrompt = buildUserPrompt({
+      topicTitle,
+      topicDescription,
+      userPerspective,
+      voiceExamples,
+    });
+  }
 
   console.log('🤖 Generating drafts with GPT-4o...');
 
@@ -130,6 +272,13 @@ export async function generateDraftVariants(params: {
       characterCount: variant.fullText.length,
     };
 
+    // Validate post and attach warnings (Option A: log and attach, don't reject)
+    const validation = validatePost(post);
+    const qualityWarnings = validation.valid ? undefined : validation.errors;
+    if (qualityWarnings?.length) {
+      console.warn(`⚠️ Draft variant ${variant.letter} quality warnings:`, qualityWarnings);
+    }
+
     // Calculate voice match score if master embedding is available
     let voiceMatchScore = 50; // Default
 
@@ -145,6 +294,7 @@ export async function generateDraftVariants(params: {
       post,
       voiceMatchScore,
       style: variant.style,
+      qualityWarnings,
     });
   }
 
@@ -178,64 +328,39 @@ export async function generateDraftVariants(params: {
 /**
  * Build system prompt with pillar context
  */
-function buildSystemPrompt(params: {
+import { GENERATION_PROMPTS, interpolate } from '@/lib/prompts/generation-prompts';
+
+/**
+ * Build system prompt with pillar context
+ */
+export function buildSystemPrompt(params: {
   pillarName: string;
   pillarDescription?: string;
   pillarTone?: string;
   targetAudience?: string;
   customPrompt?: string;
+  numVariants?: number;
+  authorContext?: string;
 }): string {
-  const { pillarName, pillarDescription, pillarTone, targetAudience, customPrompt } = params;
+  const { pillarName, pillarDescription, pillarTone, targetAudience, customPrompt, numVariants = 3, authorContext = '' } = params;
 
-  return `You are an expert LinkedIn ghostwriter specializing in authentic, engaging content.
+  // Build pillar context string
+  const contextParts = [];
+  if (pillarDescription) contextParts.push(`**DESCRIPTION:** ${pillarDescription}`);
+  if (pillarTone) contextParts.push(`**TONE:** ${pillarTone}`);
+  if (targetAudience) contextParts.push(`**TARGET AUDIENCE:** ${targetAudience}`);
+  if (customPrompt) contextParts.push(`**CUSTOM INSTRUCTIONS:** ${customPrompt}`);
 
-**CONTENT PILLAR:** ${pillarName}
-${pillarDescription ? `**DESCRIPTION:** ${pillarDescription}` : ''}
-${pillarTone ? `**TONE:** ${pillarTone}` : ''}
-${targetAudience ? `**TARGET AUDIENCE:** ${targetAudience}` : ''}
-${customPrompt ? `**CUSTOM INSTRUCTIONS:** ${customPrompt}` : ''}
+  const pillarContext = contextParts.join('\n');
 
-**YOUR TASK:**
-Generate 3 LinkedIn post variants (A, B, C) that:
-1. Match the user's authentic writing voice (study the examples provided)
-2. Cover the topic thoroughly and insightfully
-3. Engage the target audience with actionable insights
-4. Follow LinkedIn best practices (hooks, storytelling, CTAs)
+  const systemPromptText = interpolate(GENERATION_PROMPTS.systemPrompt.base, {
+    pillarName,
+    pillarContext,
+    authorContext,
+  });
 
-**VARIANT STYLES:**
-- Variant A: Narrative/storytelling style (personal, relatable)
-- Variant B: Analytical/data-driven style (insights, frameworks)
-- Variant C: Conversational/question-based style (engaging, interactive)
-
-**STRUCTURE REQUIREMENTS:**
-- Hook: Compelling opening (1-2 lines, stops the scroll)
-- Body: Main content (insights, story, data - 5-8 lines)
-- CTA: Call to action (question, request for engagement - 1-2 lines)
-- Hashtags: 3-5 relevant hashtags
-- Length: 200-600 characters (LinkedIn sweet spot)
-
-**IMPORTANT:**
-- Match the user's voice patterns from their examples
-- Avoid clichés ("game-changer", "unlock", "secret sauce")
-- Be authentic, not corporate
-- Use line breaks for readability
-- Make it scroll-stopping
-
-**OUTPUT FORMAT (JSON):**
-{
-  "variants": [
-    {
-      "letter": "A",
-      "style": "narrative",
-      "hook": "...",
-      "body": "...",
-      "cta": "...",
-      "fullText": "...",
-      "hashtags": ["...", "..."]
-    },
-    // B and C...
-  ]
-}`;
+  // Update to request specific number of variants
+  return systemPromptText.replace('3 variants', `${numVariants} variants`);
 }
 
 /**
@@ -244,28 +369,36 @@ Generate 3 LinkedIn post variants (A, B, C) that:
 function buildUserPrompt(params: {
   topicTitle: string;
   topicDescription?: string;
+  userPerspective: string;
   voiceExamples: VoiceExample[];
 }): string {
-  const { topicTitle, topicDescription, voiceExamples } = params;
+  const { topicTitle, topicDescription, userPerspective, voiceExamples } = params;
 
   // Select best voice examples (max 3 for context window)
   const selectedExamples = voiceExamples.slice(0, 3);
 
-  let prompt = `**TOPIC:** ${topicTitle}\n`;
-  if (topicDescription) {
-    prompt += `**DESCRIPTION:** ${topicDescription}\n`;
+  let examplesText = selectedExamples.map((example, index) =>
+    `Example ${index + 1}:\n${example.postText}\n\n---\n`
+  ).join('\n');
+
+  if (!examplesText) {
+    examplesText = "No specific voice examples provided. Please write in a professional, engaging, and authentic LinkedIn tone. Avoid corporate jargon.";
   }
 
-  prompt += `\n**USER'S WRITING VOICE (study these examples):**\n\n`;
+  const descriptionText = topicDescription
+    ? interpolate(GENERATION_PROMPTS.userPrompt.descriptionTemplate, { description: topicDescription })
+    : '';
 
-  selectedExamples.forEach((example, index) => {
-    prompt += `Example ${index + 1}:\n${example.postText}\n\n---\n\n`;
+  const basePrompt = interpolate(GENERATION_PROMPTS.userPrompt.base, {
+    topicTitle,
+    topicDescription: descriptionText,
+    voiceExamples: examplesText
   });
 
-  prompt += `\nNow generate 3 LinkedIn post variants (A, B, C) on the topic "${topicTitle}" that match this authentic voice.\n`;
-  prompt += `Return ONLY valid JSON matching the format specified in the system prompt.`;
+  // Add user perspective to the prompt
+  const perspectiveSection = `\n\n**USER'S PERSPECTIVE:**\n${userPerspective}\n\nPlease incorporate this perspective into the LinkedIn posts. Use this insight to guide the angle, narrative, and key points of each variant.`;
 
-  return prompt;
+  return basePrompt + perspectiveSection;
 }
 
 /**

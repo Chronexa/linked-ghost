@@ -1,0 +1,1 @@
+ALTER TABLE "generated_drafts" ADD COLUMN "user_perspective" text NOT NULL;

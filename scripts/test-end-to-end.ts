@@ -23,7 +23,7 @@ const TEST_USER_EMAIL = `e2e-test-${Date.now()}@test.com`;
 
 async function main() {
   console.log('🚀 End-to-End Integration Test');
-  console.log('=' .repeat(60));
+  console.log('='.repeat(60));
   console.log('Testing complete pipeline: Voice → Discovery → Classification → Generation\n');
 
   try {
@@ -81,7 +81,7 @@ The hardest part? Letting go of features you love that customers don't need.
 What's been your biggest PMF lesson?
 
 #ProductMarketFit #Startups #SaaS`,
-      
+
       `Most founders fail at pricing.
 
 Not because they're bad at math.
@@ -280,8 +280,8 @@ What problem do YOU wish was solved?
     const classifiedTopicRecords = classifications.map((classification) => {
       const hookAngle: 'emotional' | 'analytical' | 'storytelling' | 'contrarian' | 'data_driven' =
         classification.reasoning.toLowerCase().includes('data') ? 'data_driven' :
-        classification.reasoning.toLowerCase().includes('story') ? 'storytelling' :
-        'analytical';
+          classification.reasoning.toLowerCase().includes('story') ? 'storytelling' :
+            'analytical';
 
       return {
         userId: testUser.id,
@@ -304,9 +304,10 @@ What problem do YOU wish was solved?
     // Step 7: Generate drafts for first topic
     console.log('7️⃣ Generating LinkedIn post drafts...');
     const topicToGenerate = savedClassifiedTopics[0];
-    
+
     const draftResult = await generateDraftVariants({
       topicTitle: topicToGenerate.content,
+      userPerspective: 'Write an engaging LinkedIn post about this topic.',
       pillarName: testPillar.name,
       pillarDescription: testPillar.description || undefined,
       pillarTone: testPillar.tone || undefined,
@@ -316,6 +317,7 @@ What problem do YOU wish was solved?
         embedding: ex.embedding as number[] | undefined,
       })),
       masterVoiceEmbedding: masterVoiceEmbedding,
+      userId: testUser.id,
     });
 
     console.log(`✅ Generated ${draftResult.variants.length} draft variants`);
@@ -339,6 +341,7 @@ What problem do YOU wish was solved?
       userId: testUser.id,
       topicId: topicToGenerate.id,
       pillarId: testPillar.id,
+      userPerspective: 'Write an engaging LinkedIn post about this topic.',
       variantLetter: variant.variantLetter,
       fullText: variant.post.fullText,
       hook: variant.post.hook,
@@ -353,9 +356,9 @@ What problem do YOU wish was solved?
     console.log(`💾 Saved ${savedDrafts.length} drafts to database\n`);
 
     // Step 8: Summary
-    console.log('=' .repeat(60));
+    console.log('='.repeat(60));
     console.log('🎉 END-TO-END TEST COMPLETE!\n');
-    
+
     console.log('📊 Summary:');
     console.log(`   ✅ User created: ${testUser.email}`);
     console.log(`   ✅ Pillar created: ${testPillar.name}`);
@@ -398,14 +401,14 @@ What problem do YOU wish was solved?
     await db.delete(users).where(eq(users.id, testUser.id));
     console.log('✅ Test data cleaned up\n');
 
-    console.log('=' .repeat(60));
+    console.log('='.repeat(60));
     console.log('✅ ALL SYSTEMS OPERATIONAL!');
     console.log('🚀 ContentPilot AI is ready for production!');
-    console.log('=' .repeat(60));
+    console.log('='.repeat(60));
 
   } catch (error) {
     console.error('\n❌ End-to-end test failed:', error);
-    
+
     // Cleanup on error
     try {
       await db.delete(users).where(eq(users.id, TEST_USER_ID));
@@ -413,7 +416,7 @@ What problem do YOU wish was solved?
     } catch (cleanupError) {
       console.error('⚠️  Cleanup failed:', cleanupError);
     }
-    
+
     process.exit(1);
   }
 }

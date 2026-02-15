@@ -103,6 +103,7 @@ export interface Draft {
   fullText: string;
   characterCount: number;
   status: DraftStatus;
+  qualityWarnings?: string[] | null;
   feedbackNotes: string | null;
   approvedAt: Date | null;
   scheduledFor: Date | null;

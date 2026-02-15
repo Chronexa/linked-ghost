@@ -4,33 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Button, Card, CardHeader, CardTitle, CardContent, Badge } from '@/components/ui';
-
-// Mock data
-const mockTopic = {
-  id: '1',
-  content:
-    'AI agents are transforming customer service by reducing response times by 60%. Companies using AI-powered support see significant improvements in customer satisfaction. The technology handles routine queries while human agents focus on complex problems that require empathy and creative problem-solving.',
-  url: 'https://example.com/ai-customer-service',
-  source: 'perplexity' as const,
-  pillarName: 'AI Innovation',
-  aiScore: 92,
-  hookAngle: 'emotional' as const,
-  reasoning:
-    'This topic scores highly because it presents concrete data (60% improvement) and addresses a real business pain point. The emotional angle works well because it touches on the human element of customer service.',
-  status: 'classified' as const,
-  createdAt: '2026-02-09T06:15:00Z',
-};
-
-const mockDrafts = [
-  {
-    id: 'a1',
-    variantLetter: 'A',
-    fullText:
-      "AI agents aren't just the future—they're already here, revolutionizing customer service.\n\nCompanies using AI-powered support are seeing response times drop by 60%.\n\nBut here's what most people miss:\nIt's not about replacing humans. It's about empowering them to focus on complex problems that truly need human touch.\n\nThe best teams use AI to handle repetitive queries while their people tackle the interesting challenges.\n\nWhat's your take on AI in customer service? 🤔\n\n#AI #CustomerService #Innovation",
-    characterCount: 447,
-    status: 'draft' as const,
-  },
-];
+import { useTopic, useGenerateDrafts } from '@/lib/hooks/use-topics';
 
 const getSourceBadge = (source: string) => {
   const variants = {
@@ -42,17 +16,39 @@ const getSourceBadge = (source: string) => {
 };
 
 export default function TopicDetailPage() {
-  const params = useParams();
+  const params = useParams() as { id: string };
+  const topicId = params.id;
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showDrafts, setShowDrafts] = useState(mockDrafts.length > 0);
+
+  const { data, isLoading, refetch } = useTopic(topicId);
+  const generateDrafts = useGenerateDrafts();
+
+  const payload: any = data?.data;
+  const topic = payload?.topic;
+  const drafts = payload?.drafts || [];
 
   const handleGenerate = async () => {
+    if (!topicId) return;
     setIsGenerating(true);
-    setTimeout(() => {
+    try {
+      if (!topicId) return;
+      await generateDrafts.mutateAsync({
+        topicId,
+        userPerspective: "", // Default empty perspective for direct generation
+      });
+      await refetch();
+    } finally {
       setIsGenerating(false);
-      setShowDrafts(true);
-    }, 3000);
+    }
   };
+
+  if (isLoading || !topic) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <p className="text-charcoal-light">Loading topic...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
@@ -70,7 +66,7 @@ export default function TopicDetailPage() {
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Left Column - Topic Details */}
         <div className="space-y-6">
-          <Card>
+          <Card className="border border-border/60 shadow-warm">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Topic Details</CardTitle>
@@ -78,7 +74,7 @@ export default function TopicDetailPage() {
                   <svg className="w-5 h-5 text-warning" fill="currentColor" viewBox="0 0 20 20">
                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                   </svg>
-                  <span className="text-2xl font-bold text-charcoal">{mockTopic.aiScore}</span>
+                  <span className="text-2xl font-bold text-charcoal">{topic.aiScore}</span>
                 </div>
               </div>
             </CardHeader>
@@ -86,19 +82,19 @@ export default function TopicDetailPage() {
               <div className="space-y-4">
                 <div>
                   <label className="text-sm font-medium text-charcoal-light">Content</label>
-                  <p className="text-charcoal leading-relaxed mt-2">{mockTopic.content}</p>
+                  <p className="text-charcoal leading-relaxed mt-2">{topic.content}</p>
                 </div>
 
-                {mockTopic.url && (
+                {topic.sourceUrl && (
                   <div>
                     <label className="text-sm font-medium text-charcoal-light">Source URL</label>
                     <a
-                      href={mockTopic.url}
+                      href={topic.sourceUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-brand-text hover:text-brand text-sm mt-1 block truncate"
                     >
-                      {mockTopic.url}
+                      {topic.sourceUrl}
                     </a>
                   </div>
                 )}
@@ -107,8 +103,8 @@ export default function TopicDetailPage() {
                   <div>
                     <label className="text-sm font-medium text-charcoal-light">Source</label>
                     <div className="mt-2">
-                      <Badge variant={getSourceBadge(mockTopic.source)}>
-                        {mockTopic.source}
+                      <Badge variant={getSourceBadge(topic.source)}>
+                        {topic.source}
                       </Badge>
                     </div>
                   </div>
@@ -116,14 +112,14 @@ export default function TopicDetailPage() {
                   <div>
                     <label className="text-sm font-medium text-charcoal-light">Pillar</label>
                     <div className="mt-2">
-                      <Badge variant="success">{mockTopic.pillarName}</Badge>
+                      <Badge variant="success">{topic.pillarName}</Badge>
                     </div>
                   </div>
 
                   <div>
                     <label className="text-sm font-medium text-charcoal-light">Hook Angle</label>
                     <div className="mt-2 text-sm text-charcoal font-medium capitalize">
-                      {mockTopic.hookAngle}
+                      {topic.hookAngle}
                     </div>
                   </div>
                 </div>
@@ -150,7 +146,7 @@ export default function TopicDetailPage() {
                   <p className="text-sm font-semibold text-brand-text mb-1">
                     AI Classification Reasoning
                   </p>
-                  <p className="text-sm text-charcoal-light">{mockTopic.reasoning}</p>
+                  <p className="text-sm text-charcoal-light">{topic.reasoning}</p>
                 </div>
               </div>
             </CardContent>
@@ -159,8 +155,8 @@ export default function TopicDetailPage() {
 
         {/* Right Column - Generate Drafts */}
         <div>
-          {!showDrafts ? (
-            <Card>
+          {drafts.length === 0 ? (
+            <Card className="border border-border/60 shadow-warm h-full">
               <CardContent className="p-8 text-center">
                 <div className="w-16 h-16 bg-brand/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -205,8 +201,8 @@ export default function TopicDetailPage() {
                 </button>
               </div>
 
-              {mockDrafts.map((draft) => (
-                <Card key={draft.id} hover>
+              {drafts.map((draft: any) => (
+                <Card key={draft.id} className="group hover:shadow-warm transition-all duration-300 border-border/60">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">

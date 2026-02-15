@@ -39,7 +39,44 @@ apiClient.interceptors.response.use(
 // User & Profile
 export const userApi = {
   getProfile: () => apiClient.get('/user'),
-  updateProfile: (data: { linkedinUrl?: string; targetAudience?: string; writingStyle?: string }) =>
+  updateProfile: (data: {
+    linkedinUrl?: string;
+    linkedinHeadline?: string | null;
+    linkedinSummary?: string | null;
+    // Identity
+    fullName?: string;
+    currentRole?: string;
+    companyName?: string;
+    industry?: string;
+    location?: string;
+    // Background
+    yearsOfExperience?: string;
+    keyExpertise?: string[];
+    careerHighlights?: string;
+    currentResponsibilities?: string;
+    // Positioning
+    about?: string;
+    howYouWantToBeSeen?: string;
+    uniqueAngle?: string;
+    // Network
+    currentConnections?: number;
+    targetConnections?: number;
+    networkComposition?: string[];
+    idealNetworkProfile?: string;
+    linkedinGoal?: string;
+    // Settings
+    targetAudience?: string;
+    contentGoal?: string;
+    customGoal?: string;
+    writingStyle?: string;
+    perplexityEnabled?: boolean;
+    redditEnabled?: boolean;
+    redditKeywords?: string;
+    manualOnly?: boolean;
+    onboardingCompletedAt?: Date;
+    profileCompleteness?: number;
+    defaultInstructions?: string | null;
+  }) =>
     apiClient.patch('/user/profile', data),
   getSubscription: () => apiClient.get('/user/subscription'),
 };
@@ -48,7 +85,7 @@ export const userApi = {
 export const voiceApi = {
   getExamples: (params?: { status?: string; pillarId?: string }) =>
     apiClient.get('/voice/examples', { params }),
-  addExample: (data: { postText: string; pillarId?: string }) =>
+  addExample: (data: { postText: string; pillarId?: string; source?: 'own_post' | 'reference' }) =>
     apiClient.post('/voice/examples', data),
   deleteExample: (id: string) => apiClient.delete(`/voice/examples/${id}`),
   analyzeVoice: () => apiClient.post('/voice/analyze'),
@@ -59,25 +96,41 @@ export const pillarsApi = {
   list: (params?: { status?: string; sort?: string }) =>
     apiClient.get('/pillars', { params }),
   get: (id: string) => apiClient.get(`/pillars/${id}`),
-  create: (data: { name: string; description?: string; tone?: string; targetAudience?: string; customPrompt?: string }) =>
+  create: (data: { name: string; description?: string; tone?: string; targetAudience?: string; customPrompt?: string; cta?: string; positioning?: string }) =>
     apiClient.post('/pillars', data),
-  update: (id: string, data: Partial<{ name: string; description?: string; tone?: string; targetAudience?: string; customPrompt?: string; status?: string }>) =>
+  update: (id: string, data: Partial<{ name: string; description?: string; tone?: string; targetAudience?: string; customPrompt?: string; status?: string; cta?: string; positioning?: string }>) =>
     apiClient.patch(`/pillars/${id}`, data),
   delete: (id: string) => apiClient.delete(`/pillars/${id}`),
 };
 
-// Topics
+// Raw topics (discovery - before classification)
+export const rawTopicsApi = {
+  list: (params?: { source?: string; page?: number; limit?: number }) =>
+    apiClient.get('/raw-topics', { params }),
+  get: (id: string) => apiClient.get(`/raw-topics/${id}`),
+  create: (data: { content: string; sourceUrl?: string; source?: string; status?: string }) =>
+    apiClient.post('/raw-topics', data),
+  delete: (id: string) => apiClient.delete(`/raw-topics/${id}`),
+};
+
+// Topics (classified)
 export const topicsApi = {
   list: (params?: { status?: string; pillarId?: string; minScore?: number; sort?: string; page?: number; limit?: number }) =>
     apiClient.get('/topics', { params }),
   get: (id: string) => apiClient.get(`/topics/${id}`),
-  create: (data: { content: string; pillarId?: string }) =>
+  // `sourceUrl` is optional and used when topic comes from an external link
+  create: (data: { content: string; sourceUrl?: string; pillarId?: string }) =>
     apiClient.post('/topics', data),
   update: (id: string, data: { pillarId?: string; status?: string }) =>
     apiClient.patch(`/topics/${id}`, data),
   delete: (id: string) => apiClient.delete(`/topics/${id}`),
-  generate: (id: string) => apiClient.post(`/topics/${id}/generate`),
-  classify: (data: { topicContent: string; sourceUrl?: string; autoApprove?: boolean }) =>
+  generate: (data: { topicId: string; userPerspective: string; pillarId?: string }) =>
+    apiClient.post(`/topics/${data.topicId}/generate`, {
+      userPerspective: data.userPerspective,
+      pillarId: data.pillarId
+    }),
+  // `rawTopicId` links classification back to the original raw topic when applicable
+  classify: (data: { rawTopicId?: string; topicContent: string; sourceUrl?: string; autoApprove?: boolean }) =>
     apiClient.post('/topics/classify', data),
   classifyBatch: (data: { topics: Array<{ content: string; sourceUrl?: string }>; autoApprove?: boolean }) =>
     apiClient.post('/topics/classify/batch', data),
@@ -85,7 +138,7 @@ export const topicsApi = {
 
 // Drafts
 export const draftsApi = {
-  list: (params?: { status?: string; pillarId?: string; sort?: string; page?: number; limit?: number }) =>
+  list: (params?: { status?: string; pillarId?: string; topicId?: string; sort?: string; page?: number; limit?: number }) =>
     apiClient.get('/drafts', { params }),
   get: (id: string) => apiClient.get(`/drafts/${id}`),
   update: (id: string, data: { fullText?: string; feedbackNotes?: string; status?: string }) =>
@@ -103,6 +156,12 @@ export const discoveryApi = {
     apiClient.post('/discover', data),
   research: (data: { topic: string; pillarId?: string; autoSave?: boolean }) =>
     apiClient.post('/discover/research', data),
+  triggerBackgroundResearch: () => apiClient.post('/research'),
+};
+
+// Analytics
+export const analyticsApi = {
+  get: () => apiClient.get('/analytics'),
 };
 
 // Health

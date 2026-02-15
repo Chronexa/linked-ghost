@@ -15,30 +15,33 @@ import { testOpenAIConnection } from '@/lib/ai/openai';
 export async function GET(req: NextRequest) {
   try {
     const startTime = Date.now();
+    const isProduction = process.env.NODE_ENV === 'production';
 
-    // Test all service connections in parallel
+    // Critical services only in production; dev includes OpenAI check
     const [dbHealthy, redisHealthy, openaiHealthy] = await Promise.all([
       testConnection().catch(() => false),
       testRedisConnection().catch(() => false),
-      testOpenAIConnection().catch(() => false),
+      isProduction ? Promise.resolve(null) : testOpenAIConnection().catch(() => false),
     ]);
 
     const responseTime = Date.now() - startTime;
 
-    // System is healthy if critical services (DB, Redis) are up
-    // OpenAI is important but not critical for basic operations
     const isHealthy = dbHealthy && redisHealthy;
     const status = isHealthy ? 200 : 503;
+
+    const services: Record<string, string> = {
+      database: dbHealthy ? 'up' : 'down',
+      redis: redisHealthy ? 'up' : 'down',
+    };
+    if (!isProduction && openaiHealthy !== null) {
+      services.openai = openaiHealthy ? 'up' : 'down';
+    }
 
     return NextResponse.json(
       {
         status: isHealthy ? 'healthy' : 'unhealthy',
         timestamp: new Date().toISOString(),
-        services: {
-          database: dbHealthy ? 'up' : 'down',
-          redis: redisHealthy ? 'up' : 'down',
-          openai: openaiHealthy ? 'up' : 'down',
-        },
+        services,
         responseTime: `${responseTime}ms`,
         version: '1.0.0',
       },

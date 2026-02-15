@@ -96,6 +96,7 @@ What's the hardest thing for you to delegate?
     const result = await generateDraftVariants({
       topicTitle: 'The importance of MVP validation for SaaS startups',
       topicDescription: 'Why building an MVP and getting early customer feedback is critical before scaling',
+      userPerspective: 'I believe founders should validate with real users before scaling. Share a practical angle.',
       pillarName: 'Product Development',
       pillarDescription: 'Insights on building great products',
       pillarTone: 'practical, experienced, conversational',
@@ -104,6 +105,7 @@ What's the hardest thing for you to delegate?
       voiceExamples: sampleVoiceExamples,
       // Note: In real usage, master voice embedding would be from database
       // For testing, we'll skip voice matching
+      userId: 'test-user-id',
     });
 
     console.log('✅ Draft generation successful!\n');

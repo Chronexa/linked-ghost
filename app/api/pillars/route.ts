@@ -18,9 +18,11 @@ import { z } from 'zod';
 const createPillarSchema = z.object({
   name: z.string().min(3, 'Name must be at least 3 characters').max(100, 'Name must be at most 100 characters'),
   description: z.string().max(500, 'Description must be at most 500 characters').optional(),
-  tone: z.string().max(200, 'Tone must be at most 200 characters').optional(),
+  tone: z.string().max(200, 'Content Voice must be at most 200 characters').optional(),
   targetAudience: z.string().max(200, 'Target audience must be at most 200 characters').optional(),
   customPrompt: z.string().max(1000, 'Custom prompt must be at most 1000 characters').optional(),
+  cta: z.string().max(500, 'CTA must be at most 500 characters').optional(),
+  positioning: z.string().max(500, 'Positioning must be at most 500 characters').optional(),
 });
 
 /**
@@ -109,11 +111,23 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
       return errors.conflict('A pillar with this name already exists');
     }
 
-    // Generate slug from name
-    const slug = data.name
+    // Generate slug from name; ensure unique per user (C3)
+    const baseSlug = data.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '');
+      .replace(/^_+|_+$/g, '')
+      || 'pillar';
+    let slug = baseSlug;
+    let attempt = 0;
+    while (true) {
+      const existing = await db.query.pillars.findFirst({
+        where: and(eq(pillars.userId, user.id), eq(pillars.slug, slug)),
+        columns: { id: true },
+      });
+      if (!existing) break;
+      attempt += 1;
+      slug = `${baseSlug}_${attempt}`;
+    }
 
     // Create pillar
     const [newPillar] = await db
@@ -126,6 +140,8 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
         tone: data.tone || null,
         targetAudience: data.targetAudience || null,
         customPrompt: data.customPrompt || null,
+        cta: data.cta || null,
+        positioning: data.positioning || null,
         status: 'active',
       })
       .returning();

@@ -9,9 +9,10 @@ import { responses, errors } from '@/lib/api/response';
 import { validateBody } from '@/lib/api/validate';
 import { rateLimit } from '@/lib/api/rate-limit';
 import { db } from '@/lib/db';
-import { rawTopics, pillars } from '@/lib/db/schema';
+import { rawTopics, pillars, profiles } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { discoverTopics } from '@/lib/ai/perplexity';
+import { getPrompt, PROMPT_KEYS } from '@/lib/prompts/store';
 import { z } from 'zod';
 
 /**
@@ -41,7 +42,6 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
 
     console.log(`🔍 Discovering topics for user ${user.id} in domain: ${domain}`);
 
-    // Get pillar context if provided
     let pillarContext: string | undefined;
     if (pillarId) {
       const pillar = await db.query.pillars.findFirst({
@@ -55,11 +55,32 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
       pillarContext = `${pillar.name}: ${pillar.description || ''}. Tone: ${pillar.tone || 'professional'}. Audience: ${pillar.targetAudience || 'professionals'}.`;
     }
 
-    // Discover topics using Perplexity
+    const profile = await db.query.profiles.findFirst({
+      where: eq(profiles.userId, user.id),
+      columns: { defaultInstructions: true },
+    });
+    const userInstructions = profile?.defaultInstructions ?? '';
+    let systemPrompt: string | undefined;
+    let userQuery: string | undefined;
+    try {
+      systemPrompt = await getPrompt(PROMPT_KEYS.RESEARCH_SYSTEM, { userInstructions });
+      userQuery = await getPrompt(PROMPT_KEYS.RESEARCH_USER, {
+        domain,
+        count,
+        pillarContext: pillarContext ? `Focus on topics relevant to: ${pillarContext}` : '',
+        userInstructions: userInstructions ? `User instructions: ${userInstructions}` : '',
+      });
+    } catch {
+      systemPrompt = undefined;
+      userQuery = undefined;
+    }
+
     const discoveryResult = await discoverTopics({
       domain,
       pillarContext,
       count,
+      systemPrompt,
+      userQuery,
     });
 
     // Save topics to database if autoSave is enabled

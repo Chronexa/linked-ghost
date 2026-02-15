@@ -1,316 +1,164 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button, Card, CardContent, Input, Textarea } from '@/components/ui';
+import { Progress } from '@/components/ui';
+import { StepProfile, ProfileData } from '@/components/onboarding/step-profile';
+import { StepPillars } from '@/components/onboarding/step-pillars';
+import { StepVoice, VoiceData } from '@/components/onboarding/step-voice';
+import { useCreatePillar } from '@/lib/hooks/use-pillars';
+import { useAddVoiceExample } from '@/lib/hooks/use-voice';
+import { useUpdateProfile } from '@/lib/hooks/use-user';
+import { showSuccess, showError } from '@/lib/toast-utils';
 
-const steps = [
-  { id: 1, name: 'Welcome', icon: '👋' },
-  { id: 2, name: 'Content Pillars', icon: '🎯' },
-  { id: 3, name: 'Voice Training', icon: '✍️' },
-  { id: 4, name: 'Connect Sources', icon: '🔗' },
-];
+const ONBOARDING_STEP_KEY = 'contentpilot_onboarding_step_v2';
 
 export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
-  const [pillars, setPillars] = useState<string[]>(['', '', '']);
-  const [voiceExamples, setVoiceExamples] = useState<string[]>(['', '', '']);
-  const [sources, setSources] = useState({
-    perplexity: false,
-    reddit: false,
-    redditKeywords: '',
-    manualOnly: true,
+  const [progress, setProgress] = useState(33);
+
+  // State for all steps
+  const [profileData, setProfileData] = useState<ProfileData>({
+    contentGoal: 'brand',
+    targetAudience: '',
+    linkedinUrl: ''
   });
+  const [pillars, setPillars] = useState<string[]>([]);
+  const [voiceData, setVoiceData] = useState<VoiceData>({ primarySample: '' });
 
-  const handleAddPillar = () => setPillars([...pillars, '']);
-  const handleRemovePillar = (index: number) => {
-    setPillars(pillars.filter((_, i) => i !== index));
-  };
+  // API Hooks
+  const createPillar = useCreatePillar();
+  const addVoiceExample = useAddVoiceExample();
+  const updateProfile = useUpdateProfile();
 
-  const handleFinish = () => {
-    router.push('/dashboard');
-  };
-
-  const isStepComplete = () => {
-    if (currentStep === 2) {
-      return pillars.filter((p) => p.trim()).length >= 3;
+  // Load progress from localStorage
+  useEffect(() => {
+    const savedStep = localStorage.getItem(ONBOARDING_STEP_KEY);
+    if (savedStep) {
+      const step = parseInt(savedStep);
+      // Don't restore if complete (step 4 or higher means completed)
+      if (step < 4) {
+        setCurrentStep(step);
+        setProgress(step === 1 ? 33 : step === 2 ? 66 : 100);
+      }
     }
-    if (currentStep === 3) {
-      return voiceExamples.filter((v) => v.trim().length >= 100).length >= 3;
-    }
-    return true;
+  }, []);
+
+  const saveProgress = (step: number) => {
+    setCurrentStep(step);
+    setProgress(step === 1 ? 33 : step === 2 ? 66 : 100);
+    localStorage.setItem(ONBOARDING_STEP_KEY, step.toString());
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const handleProfileNext = async (data: ProfileData) => {
+    try {
+      setProfileData(data);
+      await updateProfile.mutateAsync({
+        contentGoal: data.contentGoal,
+        customGoal: data.customGoal,
+        targetAudience: data.targetAudience,
+        linkedinUrl: data.linkedinUrl,
+      });
+      saveProgress(2);
+    } catch (error) {
+      showError("Failed to save profile data. Please try again.");
+    }
+  };
+
+  const handlePillarsNext = async (selectedPillars: string[]) => {
+    try {
+      setPillars(selectedPillars);
+      // Persist to DB immediately
+      await Promise.all(selectedPillars.map(name => createPillar.mutateAsync({ name })));
+      saveProgress(3);
+    } catch (error) {
+      showError("Failed to save pillars. Please try again.");
+    }
+  };
+
+  const handleVoiceNext = async (data: VoiceData) => {
+    try {
+      setVoiceData(data);
+      // Voice samples
+      const promises = [];
+      if (data.primarySample?.trim()) {
+        promises.push(addVoiceExample.mutateAsync({ postText: data.primarySample }));
+      }
+      if (data.additionalSamples) {
+        data.additionalSamples.forEach(sample => {
+          if (sample.trim()) promises.push(addVoiceExample.mutateAsync({ postText: sample }));
+        });
+      }
+
+      if (promises.length > 0) {
+        await Promise.all(promises);
+      }
+
+      // Mark onboarding complete and auto-enable research
+      await updateProfile.mutateAsync({
+        perplexityEnabled: true,
+        onboardingCompletedAt: new Date(),
+      });
+
+      // Onboarding complete - redirect to dashboard
+      localStorage.removeItem(ONBOARDING_STEP_KEY);
+      showSuccess("Setup complete! Welcome to ContentPilot.");
+      router.push('/dashboard');
+    } catch (error) {
+      showError("Failed to complete onboarding. Please try again.");
+    }
+  };
+
+
+
+
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
-      <div className="max-w-3xl w-full">
-        {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            {steps.map((step, index) => (
-              <div key={step.id} className="flex items-center flex-1">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition ${
-                    currentStep >= step.id
-                      ? 'bg-brand text-white'
-                      : 'bg-border text-charcoal-light'
-                  }`}
-                >
-                  {step.icon}
-                </div>
-                {index < steps.length - 1 && (
-                  <div
-                    className={`flex-1 h-1 mx-2 rounded transition ${
-                      currentStep > step.id ? 'bg-brand' : 'bg-border'
-                    }`}
-                  />
-                )}
-              </div>
-            ))}
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Header */}
+      <header className="h-16 border-b border-slate-100 flex items-center px-6 lg:px-12 sticky top-0 bg-white/80 backdrop-blur z-50">
+        <div className="flex items-center gap-2 font-display font-bold text-xl tracking-tight text-slate-900">
+          <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white text-lg">CP</div>
+          ContentPilot
+        </div>
+        <div className="ml-auto flex items-center gap-4">
+          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+            Setup Progress
           </div>
-          <div className="flex items-center justify-between text-xs">
-            {steps.map((step) => (
-              <span
-                key={step.id}
-                className={`font-medium ${
-                  currentStep >= step.id ? 'text-brand' : 'text-charcoal-light'
-                }`}
-              >
-                {step.name}
-              </span>
-            ))}
+          <div className="w-32 lg:w-48">
+            <Progress value={progress} className="h-2" />
           </div>
         </div>
+      </header>
 
-        {/* Step Content */}
-        <Card className="shadow-card-hover">
-          <CardContent className="p-8">
-            {/* Step 1: Welcome */}
-            {currentStep === 1 && (
-              <div className="text-center py-8">
-                <div className="w-20 h-20 bg-brand/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <span className="text-5xl">👋</span>
-                </div>
-                <h1 className="font-display text-4xl font-bold text-charcoal mb-4">
-                  Welcome to ContentPilot AI
-                </h1>
-                <p className="text-charcoal-light text-lg leading-relaxed max-w-xl mx-auto mb-8">
-                  Let&apos;s set up your AI content assistant. This will take about 3-5 minutes and help us
-                  create posts that sound authentically you.
-                </p>
-                <div className="inline-block p-4 bg-brand/5 rounded-lg border border-brand/20 mb-8">
-                  <p className="text-sm text-charcoal-light">
-                    <span className="font-semibold text-brand-text">💡 Quick tip:</span> The more effort you put into
-                    this setup, the better your posts will be. It&apos;s worth it!
-                  </p>
-                </div>
-                <Button size="lg" onClick={() => setCurrentStep(2)}>
-                  Get Started →
-                </Button>
-              </div>
-            )}
+      {/* Main Content */}
+      <main className="flex-1 flex items-center justify-center p-6 lg:p-12">
+        <div className="w-full max-w-2xl">
+          {currentStep === 1 && (
+            <StepProfile
+              initialData={profileData}
+              onNext={handleProfileNext}
+            />
+          )}
 
-            {/* Step 2: Content Pillars */}
-            {currentStep === 2 && (
-              <div>
-                <h2 className="font-display text-3xl font-bold text-charcoal mb-3">
-                  Define Your Content Pillars
-                </h2>
-                <p className="text-charcoal-light mb-6">
-                  Add 3-5 content themes you want to post about. These help organize your content and keep
-                  your LinkedIn presence focused.
-                </p>
+          {currentStep === 2 && (
+            <StepPillars
+              initialPillars={pillars}
+              onNext={handlePillarsNext}
+            />
+          )}
 
-                <div className="space-y-3 mb-6">
-                  {pillars.map((pillar, index) => (
-                    <div key={index} className="flex items-center space-x-2">
-                      <Input
-                        type="text"
-                        value={pillar}
-                        onChange={(e) => {
-                          const newPillars = [...pillars];
-                          newPillars[index] = e.target.value;
-                          setPillars(newPillars);
-                        }}
-                        placeholder={`Pillar ${index + 1} (e.g., AI Innovation, Founder Journey)`}
-                      />
-                      {pillars.length > 3 && (
-                        <button
-                          onClick={() => handleRemovePillar(index)}
-                          className="p-2 text-error hover:bg-error/5 rounded transition"
-                          aria-label="Remove pillar"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {pillars.length < 5 && (
-                  <Button variant="secondary" size="sm" onClick={handleAddPillar}>
-                    + Add Another Pillar
-                  </Button>
-                )}
-
-                <div className="mt-6 p-4 bg-background rounded-lg">
-                  <p className="text-sm text-charcoal-light">
-                    <span className="font-semibold text-charcoal">Examples:</span> AI Innovation, Leadership
-                    Insights, Founder Journey, Productivity Hacks, Industry Trends
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Voice Training */}
-            {currentStep === 3 && (
-              <div>
-                <h2 className="font-display text-3xl font-bold text-charcoal mb-3">
-                  Train Your Voice
-                </h2>
-                <p className="text-charcoal-light mb-6">
-                  Paste 3-5 of your best LinkedIn posts so our AI can learn your unique writing style, tone,
-                  and personality.
-                </p>
-
-                <div className="space-y-4">
-                  {voiceExamples.map((example, index) => (
-                    <Textarea
-                      key={index}
-                      label={`Example ${index + 1}`}
-                      value={example}
-                      onChange={(e) => {
-                        const newExamples = [...voiceExamples];
-                        newExamples[index] = e.target.value;
-                        setVoiceExamples(newExamples);
-                      }}
-                      placeholder="Paste a LinkedIn post that represents your writing style..."
-                      rows={4}
-                      helperText={
-                        example.length > 0
-                          ? `${example.length} characters ${
-                              example.length >= 100 ? '✓' : '(min 100)'
-                            }`
-                          : ''
-                      }
-                    />
-                  ))}
-                </div>
-
-                <div className="mt-6 p-4 bg-brand/5 rounded-lg border border-brand/20">
-                  <p className="text-sm text-charcoal-light">
-                    <span className="font-semibold text-brand-text">💡 Pro tip:</span> Choose posts with
-                    different styles and lengths. This helps AI capture your full range.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Step 4: Connect Sources */}
-            {currentStep === 4 && (
-              <div>
-                <h2 className="font-display text-3xl font-bold text-charcoal mb-3">
-                  Connect Content Sources
-                </h2>
-                <p className="text-charcoal-light mb-6">
-                  Choose where ContentPilot AI should find content inspiration. You can always change this
-                  later.
-                </p>
-
-                <div className="space-y-4">
-                  {/* Perplexity */}
-                  <label className="flex items-start p-4 bg-background rounded-lg cursor-pointer hover:bg-border/20 transition">
-                    <input
-                      type="checkbox"
-                      checked={sources.perplexity}
-                      onChange={(e) => setSources({ ...sources, perplexity: e.target.checked })}
-                      className="w-5 h-5 text-brand rounded mt-0.5 accent-brand"
-                    />
-                    <div className="ml-3 flex-1">
-                      <p className="font-semibold text-charcoal">Perplexity AI (Recommended)</p>
-                      <p className="text-sm text-charcoal-light mt-1">
-                        Automatically discover trending news and insights in your industry
-                      </p>
-                    </div>
-                  </label>
-
-                  {/* Reddit */}
-                  <div className="p-4 bg-background rounded-lg">
-                    <label className="flex items-start cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={sources.reddit}
-                        onChange={(e) => setSources({ ...sources, reddit: e.target.checked })}
-                        className="w-5 h-5 text-brand rounded mt-0.5 accent-brand"
-                      />
-                      <div className="ml-3 flex-1">
-                        <p className="font-semibold text-charcoal">Reddit</p>
-                        <p className="text-sm text-charcoal-light mt-1">
-                          Monitor Reddit discussions by keywords
-                        </p>
-                      </div>
-                    </label>
-                    {sources.reddit && (
-                      <div className="mt-3 ml-8">
-                        <Input
-                          type="text"
-                          value={sources.redditKeywords}
-                          onChange={(e) =>
-                            setSources({ ...sources, redditKeywords: e.target.value })
-                          }
-                          placeholder="e.g., AI, startups, productivity"
-                          helperText="Enter keywords separated by commas"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Manual Only */}
-                  <label className="flex items-start p-4 bg-background rounded-lg cursor-pointer hover:bg-border/20 transition">
-                    <input
-                      type="checkbox"
-                      checked={sources.manualOnly}
-                      onChange={(e) => setSources({ ...sources, manualOnly: e.target.checked })}
-                      className="w-5 h-5 text-brand rounded mt-0.5 accent-brand"
-                    />
-                    <div className="ml-3 flex-1">
-                      <p className="font-semibold text-charcoal">Manual Input Only</p>
-                      <p className="text-sm text-charcoal-light mt-1">
-                        Add topics manually when you find interesting content
-                      </p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* Navigation Buttons */}
-            <div className="flex items-center justify-between pt-8 mt-8 border-t border-border">
-              {currentStep > 1 && (
-                <Button variant="secondary" onClick={() => setCurrentStep(currentStep - 1)}>
-                  ← Back
-                </Button>
-              )}
-              {currentStep < 4 ? (
-                <Button
-                  onClick={() => setCurrentStep(currentStep + 1)}
-                  disabled={!isStepComplete()}
-                  className="ml-auto"
-                >
-                  Next Step →
-                </Button>
-              ) : (
-                <Button onClick={handleFinish} variant="success" size="lg" className="ml-auto">
-                  Complete Setup 🎉
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          {currentStep === 3 && (
+            <StepVoice
+              initialData={voiceData}
+              onNext={handleVoiceNext}
+              onBack={() => saveProgress(2)}
+            />
+          )}
+        </div>
+      </main>
     </div>
   );
 }

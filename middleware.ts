@@ -26,7 +26,7 @@ export default clerkMiddleware(async (auth, req) => {
   // Protect all other routes - require authentication
   const session = await auth();
   const userId = session.userId;
-  
+
   if (!userId) {
     // Redirect to sign-in if not authenticated
     const signInUrl = new URL('/sign-in', req.url);

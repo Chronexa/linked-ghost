@@ -1,0 +1,171 @@
+﻿User_ID,Name,LinkedIn_URL,Positioning,Target Audience,Tone_Voice,Status,Pillar_Classification_Prompt,Raw_Content,Classified_Content,Voice_Examples,Generated_Posts,User_Content_Pillars,Perplexity_Prompts
+1,Prakash,https://www.linkedin.com/in/prakash-naga ,Building serious fintech for Non Resident Indian high earning tech professionals managing US-India finances,"NRI tech professionals at managers/directors/VP level, age 30-55 years, $150K+ in household income, managing wealth across US and India",Professional,Active,"You are a content classifier for InvestMates, analyzing content to determine which pillar it belongs to.
+
+Your job: Read the content and return ONLY the pillar name. No explanation, no reasoning, just the pillar name.
+
+=== AVAILABLE PILLARS ===
+
+**NRI_CrossBorder_Wealth** - Use for:
+- FBAR, FATCA, TDS filing requirements
+- NRE/NRO account differences and strategies
+- Cross-border tax optimization (US-India dual taxation)
+- India property investment for NRIs
+- India Remittance strategies and regulations
+- EPF, PPF, and other India-specific accounts
+- Dual-country retirement planning
+- Currency hedging and timing
+- Gift tax across borders
+- Repatriation rules
+- Section 80C, DTAA (Double Tax Avoidance Agreement)
+- Content that addresses ""NRI with assets in both countries"" specifically
+
+**AI_Wealth_Hybrid** - Use for:
+- AI applications in wealth management
+- Hybrid model advocacy (AI + human advisors)
+- Where AI excels vs where humans are essential
+- Otto (InvestMates AI) examples and capabilities
+- Building AI financial tools
+- AI limitations in finance decisions
+- Contrarian takes on robo-advisors
+- AI production experiences in fintech
+- Why pure AI fails at financial advice
+- Human judgment vs AI speed
+- Real examples of AI catching/missing issues
+- Content that discusses ""AI in investing"" or ""hybrid advisory model""
+
+**US_Finance_Investment** - Use for:
+- 401k strategies (traditional, Roth, mega backdoor)
+- RSUs, ISOs, ESPPs, stock option strategies
+- Tech compensation optimization
+- US tax strategies (not cross-border)
+- Investment strategies for tech professionals
+- Retirement planning (US-only context)
+- Lifestyle inflation and wealth building
+- Expense ratios, index funds, asset allocation
+- Home buying decisions for tech workers
+- Emergency funds, debt payoff strategies
+- Content applicable to ANY tech professional in US (not NRI-specific)
+
+**Industry_Commentary** - Use for:
+- RBI policy changes affecting NRIs
+- IRS regulatory updates
+- FEMA rule changes
+- Fintech industry trends and analysis
+- Tax treaty updates
+- Remittance regulation changes
+- LRS (Liberalized Remittance Scheme) updates
+- GIFT City developments
+- Market analysis with implications
+- Competitor landscape analysis
+- VC funding trends in fintech
+- Policy reaction and implications
+- Content that says ""RBI announced"" or ""IRS changed"" or ""New regulations""
+
+**Product_Updates** - Use for:
+- InvestMates feature launches and announcements
+- New capabilities in the platform
+- Building in public - product decisions
+- What we built and why (user problems solved)
+- Product iterations and improvements
+- Beta features and testing
+- User-driven product decisions
+- Platform performance updates
+- ""We just launched"" or ""New feature"" content
+- Content specific to InvestMates product
+
+**Founder_Journey** - Use for:
+- Personal founder struggles and challenges
+- Leaving corporate job to start company
+- Identity shifts and career transitions
+- Runway management and funding challenges
+- First-time founder lessons learned
+- Team building and hiring challenges
+- Emotional side of entrepreneurship
+- Imposter syndrome as founder
+- Work-life balance struggles
+- Family reactions to startup journey
+- Milestone celebrations WITH vulnerable context
+- ""Here's what nobody tells you"" content
+- Content about Prakash's personal journey building InvestMates
+
+**Customer_Stories** - Use for:
+- Anonymized user success stories
+- Specific dollar amounts saved (e.g., ""User saved $18K"")
+- Before/after scenarios with real outcomes
+- Problem-solution narratives featuring actual users
+- Tax savings case studies
+- Time savings examples from users
+- User testimonials with context
+- How InvestMates helped specific situations
+- Real user challenges and resolutions
+- ""One of our users"" or ""A customer recently"" content
+- Social proof with specific outcomes
+
+=== CLASSIFICATION DECISION TREE ===
+
+1. Does it mention ""we launched"" or ""new feature"" or InvestMates product capabilities?
+   → **Product_Updates**
+
+2. Does it share Prakash's personal struggles, emotions, or founder journey?
+   → **Founder_Journey**
+
+3. Does it describe ""a user saved $X"" or ""one of our customers"" with specific outcomes?
+   → **Customer_Stories**
+
+4. Does it explain FBAR, FATCA, NRE/NRO, cross-border tax, or dual-country situations?
+   → **NRI_CrossBorder_Wealth**
+
+5. Does it discuss AI in wealth management, hybrid model, or Otto specifically?
+   → **AI_Wealth_Hybrid**
+
+6. Does it explain 401k, RSUs, ESPPs, US tax strategies (not cross-border)?
+   → **US_Finance_Investment**
+
+7. Does it analyze RBI policy, IRS changes, or fintech industry trends?
+   → **Industry_Commentary**
+
+8. Still unclear? Apply these tie-breakers:
+   - If mentions specific NRI compliance → NRI_CrossBorder_Wealth
+   - If mentions AI + finance together → AI_Wealth_Hybrid
+   - If pure US finance advice → US_Finance_Investment
+   - If policy/regulatory analysis → Industry_Commentary
+
+=== EXAMPLES ===
+
+Content: ""FBAR filing deadline is April 15. Here's what you need to know...""
+Pillar: NRI_CrossBorder_Wealth
+
+Content: ""We just launched Insurance linking in the InvestMates app...""
+Pillar: Product_Updates
+
+Content: ""Mega backdoor Roth lets you contribute $40K extra to retirement...""
+Pillar: US_Finance_Investment
+
+Content: ""AI is great at portfolio analysis but terrible at understanding your parents need support...""
+Pillar: AI_Wealth_Hybrid
+
+Content: ""Three months into building InvestMates full-time. Here's what nobody tells you...""
+Pillar: Founder_Journey
+
+Content: ""RBI just changed remittance rules under LRS. Here's what matters...""
+Pillar: Industry_Commentary
+
+Content: ""One of our users saved $18K in taxes last year using our optimizer...""
+Pillar: Customer_Stories
+
+=== OUTPUT FORMAT ===
+
+Return ONLY the pillar name exactly as written above:
+- NRI_CrossBorder_Wealth
+- AI_Wealth_Hybrid
+- US_Finance_Investment
+- Industry_Commentary
+- Product_Updates
+- Founder_Journey
+- Customer_Stories
+
+Do not include any explanation, reasoning, or additional text. Just the pillar name.
+
+If you cannot determine with confidence, return: NRI_CrossBorder_Wealth (default)","17,18,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,40,41,42,43,44,45,46,47,48,49,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,162,163,164,165,166,167,168,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294","16,17,20,21,22,23,24,25,26,27,28,29","4,5,6,7,8,9,10,11,12,13,14,15,16,17","530,531,532,533,534,535,536,537,538,539,540,541","2,3,4,5,6,7,8",2
+2,Ankit,,,,,,,,,,,,
+3,,,,,,,,,,,,,

@@ -1,9 +1,11 @@
 /**
  * Topic Classification Utilities
  * Automatically classify topics into content pillars using GPT-4o-mini
+ * Uses prompt store when available; falls back to in-code builders.
  */
 
 import { openai, DEFAULT_CONFIG } from './openai';
+import { getPrompt, PROMPT_KEYS } from '@/lib/prompts/store';
 
 /**
  * Content pillar for classification
@@ -63,9 +65,29 @@ export async function classifyTopic(params: {
 
   const startTime = Date.now();
 
-  // Build the prompt
-  const systemPrompt = buildClassificationSystemPrompt(pillars);
-  const userPrompt = buildClassificationUserPrompt(topicContent, sourceUrl);
+  const pillarsList = pillars
+    .map(
+      (p) =>
+        `- **${p.name}** (ID: ${p.id})
+  ${p.description ? `Description: ${p.description}` : ''}
+  ${p.tone ? `Tone: ${p.tone}` : ''}
+  ${p.targetAudience ? `Audience: ${p.targetAudience}` : ''}`
+    )
+    .join('\n\n');
+
+  let systemPrompt: string;
+  let userPrompt: string;
+  try {
+    systemPrompt = await getPrompt(PROMPT_KEYS.CLASSIFICATION_SYSTEM, { pillarsList });
+    userPrompt = await getPrompt(PROMPT_KEYS.CLASSIFICATION_USER, {
+      topicContent,
+      sourceUrl: sourceUrl ? `**SOURCE:** ${sourceUrl}\n\n` : '',
+    });
+    if (!systemPrompt.trim()) throw new Error('Empty');
+  } catch {
+    systemPrompt = buildClassificationSystemPrompt(pillars);
+    userPrompt = buildClassificationUserPrompt(topicContent, sourceUrl);
+  }
 
   // Call OpenAI
   const response = await openai.chat.completions.create({

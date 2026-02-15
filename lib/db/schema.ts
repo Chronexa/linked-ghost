@@ -13,6 +13,9 @@ export const hookAngleEnum = pgEnum('hook_angle', ['emotional', 'analytical', 's
 export const draftStatusEnum = pgEnum('draft_status', ['draft', 'approved', 'scheduled', 'posted', 'rejected']);
 export const planTypeEnum = pgEnum('plan_type', ['starter', 'growth', 'agency']);
 export const subscriptionStatusEnum = pgEnum('subscription_status', ['active', 'canceled', 'past_due', 'trialing']);
+export const messageRoleEnum = pgEnum('message_role', ['user', 'assistant']);
+export const messageTypeEnum = pgEnum('message_type', ['text', 'research_request', 'topic_cards', 'perspective_request', 'draft_variants', 'action_prompt']);
+
 
 // ============================================================================
 // TABLES
@@ -31,15 +34,72 @@ export const users = pgTable('users', {
 });
 
 // User profiles (content generation settings)
+// User profiles (content generation settings & identity)
 export const profiles = pgTable('profiles', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
+
+  // 1. Professional Identity
+  fullName: varchar('full_name', { length: 255 }),
+  currentRole: varchar('current_role', { length: 255 }),
+  companyName: varchar('company_name', { length: 255 }),
+  industry: varchar('industry', { length: 100 }),
+  location: varchar('location', { length: 100 }),
   linkedinUrl: text('linkedin_url'),
-  targetAudience: text('target_audience'),
+  linkedinHeadline: varchar('linkedin_headline', { length: 500 }),
+  linkedinSummary: text('linkedin_summary'),
+
+  // 2. Professional Background
+  yearsOfExperience: varchar('years_of_experience', { length: 50 }), // "0-2", "3-5", etc.
+  keyExpertise: jsonb('key_expertise'), // Array of strings
+  careerHighlights: text('career_highlights'),
+  currentResponsibilities: text('current_responsibilities'),
+
+  // 3. Personal Positioning
+  about: text('about'), // Bio
+  howYouWantToBeSeen: varchar('how_you_want_to_be_seen', { length: 50 }), // "expert", "peer", etc.
+  uniqueAngle: text('unique_angle'),
+
+  // 4. Network & Goals
+  currentConnections: integer('current_connections'),
+  targetConnections: integer('target_connections'),
+  networkComposition: jsonb('network_composition'), // Array of strings e.g. ["Founders", "Investors"]
+  idealNetworkProfile: text('ideal_network_profile'),
+  linkedinGoal: varchar('linkedin_goal', { length: 50 }), // "brand", "leads", etc.
+
+  // existing fields (maintained for backward compatibility where needed)
+  targetAudience: text('target_audience'), // Kept for legacy, can map to idealNetworkProfile
+  contentGoal: text('content_goal'),
+  customGoal: text('custom_goal'),
   writingStyle: text('writing_style'),
+
+  // Voice & Settings
   voiceConfidenceScore: integer('voice_confidence_score').default(0), // 0-100
-  voiceEmbedding: jsonb('voice_embedding'), // Aggregated voice embedding
+  voiceEmbedding: jsonb('voice_embedding'),
   lastVoiceTrainingAt: timestamp('last_voice_training_at'),
+  perplexityEnabled: boolean('perplexity_enabled').default(true),
+  redditEnabled: boolean('reddit_enabled').default(false),
+  redditKeywords: text('reddit_keywords'),
+  manualOnly: boolean('manual_only').default(false),
+
+  // Metadata
+  profileCompleteness: integer('profile_completeness').default(0),
+  onboardingCompletedAt: timestamp('onboarding_completed_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+
+  // Prompt personalisation: default instructions for all AI (research, classification, draft)
+  defaultInstructions: text('default_instructions'),
+});
+
+// Centralised prompt templates (global defaults; editable in Settings / admin)
+export const promptTemplates = pgTable('prompt_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  key: varchar('key', { length: 100 }).notNull().unique(),
+  name: varchar('name', { length: 255 }).notNull(),
+  body: text('body').notNull(),
+  description: text('description'),
+  defaultFor: varchar('default_for', { length: 50 }).notNull(), // research | classification | draft_system | draft_user
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -54,12 +114,17 @@ export const pillars = pgTable('pillars', {
   tone: text('tone'), // e.g., "professional, analytical, forward-thinking"
   targetAudience: text('target_audience'), // e.g., "Tech founders, CTOs"
   customPrompt: text('custom_prompt'), // Additional instructions for AI
+  cta: text('cta'), // e.g., "Subscribe to newsletter"
+  positioning: text('positioning'), // e.g., "Contrarian expert"
   status: pillarStatusEnum('status').notNull().default('active'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
-// Voice training examples (user's past LinkedIn posts)
+// Voice example source: own post or target reference (style to emulate)
+export const voiceExampleSourceEnum = pgEnum('voice_example_source', ['own_post', 'reference']);
+
+// Voice training examples (user's past LinkedIn posts or reference posts they want to sound like)
 export const voiceExamples = pgTable('voice_examples', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -68,6 +133,7 @@ export const voiceExamples = pgTable('voice_examples', {
   characterCount: integer('character_count').notNull(),
   embedding: jsonb('embedding'), // OpenAI text-embedding-3-small
   status: varchar('status', { length: 50 }).notNull().default('active'),
+  source: voiceExampleSourceEnum('source').notNull().default('own_post'), // own_post | reference
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
@@ -111,12 +177,14 @@ export const generatedDrafts = pgTable('generated_drafts', {
   userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
   topicId: uuid('topic_id').notNull().references(() => classifiedTopics.id, { onDelete: 'cascade' }),
   pillarId: uuid('pillar_id').notNull().references(() => pillars.id, { onDelete: 'cascade' }),
+  userPerspective: text('user_perspective').notNull(), // User's take on the topic that generated this draft
   variantLetter: varchar('variant_letter', { length: 1 }).notNull(), // A, B, or C
   fullText: text('full_text').notNull(),
   hook: text('hook'), // Opening line
   body: text('body'), // Main content
   cta: text('cta'), // Call to action
   hashtags: jsonb('hashtags'), // Array of hashtags
+  qualityWarnings: jsonb('quality_warnings'), // Array of validation warnings
   characterCount: integer('character_count').notNull(),
   estimatedEngagement: integer('estimated_engagement'), // Predicted likes/comments
   status: draftStatusEnum('status').notNull().default('draft'),
@@ -160,6 +228,28 @@ export const usageTracking = pgTable('usage_tracking', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+// Conversations (chat sessions)
+export const conversations = pgTable('conversations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 500 }), // Auto-generated from first message
+  lastMessagePreview: text('last_message_preview'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Conversation messages
+export const conversationMessages = pgTable('conversation_messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  conversationId: uuid('conversation_id').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  role: messageRoleEnum('role').notNull(), // 'user' or 'assistant'
+  content: text('content').notNull(),
+  messageType: messageTypeEnum('message_type'), // 'text', 'research_request', 'topic_cards', etc.
+  metadata: jsonb('metadata'), // Stores topic cards, draft IDs, sources, etc.
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
 // ============================================================================
 // RELATIONS
 // ============================================================================
@@ -179,6 +269,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     references: [subscriptions.userId],
   }),
   usageTracking: many(usageTracking),
+  conversations: many(conversations),
 }));
 
 export const profilesRelations = relations(profiles, ({ one }) => ({
@@ -261,12 +352,34 @@ export const usageTrackingRelations = relations(usageTracking, ({ one }) => ({
   }),
 }));
 
+export const conversationsRelations = relations(conversations, ({ one, many }) => ({
+  user: one(users, {
+    fields: [conversations.userId],
+    references: [users.id],
+  }),
+  messages: many(conversationMessages),
+}));
+
+export const conversationMessagesRelations = relations(conversationMessages, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [conversationMessages.conversationId],
+    references: [conversations.id],
+  }),
+  user: one(users, {
+    fields: [conversationMessages.userId],
+    references: [users.id],
+  }),
+}));
+
 // ============================================================================
 // TYPES (for TypeScript inference)
 // ============================================================================
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+
+export type PromptTemplate = typeof promptTemplates.$inferSelect;
+export type NewPromptTemplate = typeof promptTemplates.$inferInsert;
 
 export type Profile = typeof profiles.$inferSelect;
 export type NewProfile = typeof profiles.$inferInsert;
@@ -291,3 +404,9 @@ export type NewSubscription = typeof subscriptions.$inferInsert;
 
 export type UsageTracking = typeof usageTracking.$inferSelect;
 export type NewUsageTracking = typeof usageTracking.$inferInsert;
+
+export type Conversation = typeof conversations.$inferSelect;
+export type NewConversation = typeof conversations.$inferInsert;
+
+export type ConversationMessage = typeof conversationMessages.$inferSelect;
+export type NewConversationMessage = typeof conversationMessages.$inferInsert;

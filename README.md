@@ -6,6 +6,16 @@ Transform industry news, insights, and data into engaging LinkedIn posts in unde
 
 ---
 
+## 📌 Start here
+
+- **New to the repo?** → [SETUP-CHECKLIST.md](SETUP-CHECKLIST.md) then [BACKEND-SETUP-GUIDE.md](BACKEND-SETUP-GUIDE.md)
+- **Architecture & code quality** → [docs/CTO-CODE-REVIEW-AND-PLAN.md](docs/CTO-CODE-REVIEW-AND-PLAN.md)
+- **Prompts & personalisation** → [docs/PROMPTS-AUDIT.md](docs/PROMPTS-AUDIT.md)
+- **API & DB** → [docs/04-API-SPECIFICATION.md](docs/04-API-SPECIFICATION.md), [docs/03-DATABASE-SCHEMA.md](docs/03-DATABASE-SCHEMA.md)
+- **AI pipeline** → [docs/AI-INTEGRATION.md](docs/AI-INTEGRATION.md), [docs/DRAFT-GENERATION.md](docs/DRAFT-GENERATION.md)
+
+---
+
 ## 🎯 Project Status
 
 ### ✅ **Frontend: COMPLETE** (14 pages, design system, components)
@@ -234,6 +244,7 @@ npm run db:studio        # Open Drizzle Studio
 npm run db:test          # Test connection
 
 # Testing
+npm run test             # Unit tests (Vitest)
 npm run check-env        # Validate environment vars
 npm run redis:test       # Test Redis connection
 npm run setup            # Run all setup tests
@@ -288,6 +299,8 @@ See `docs/05-DEVELOPMENT-ROADMAP.md` for details.
 - `docs/03-DATABASE-SCHEMA.md` - Database design
 - `docs/04-API-SPECIFICATION.md` - API endpoints
 - `docs/05-DEVELOPMENT-ROADMAP.md` - Implementation plan
+- `docs/CTO-CODE-REVIEW-AND-PLAN.md` - Code review and remediation plan
+- `docs/PROMPTS-AUDIT.md` - Prompt templates and variables
 
 ### **Design Documentation**
 - `DESIGN-SYSTEM-COMPLETE.md` - Design system specs
@@ -350,6 +363,9 @@ See `.env.example` for full template.
 ## 🧪 Testing
 
 ```bash
+# Unit tests (validate, response, health route)
+npm run test
+
 # Environment validation
 npm run check-env
 
@@ -359,7 +375,7 @@ npm run db:test
 # Redis connection
 npm run redis:test
 
-# Run all tests
+# Run all setup checks
 npm run setup
 ```
 

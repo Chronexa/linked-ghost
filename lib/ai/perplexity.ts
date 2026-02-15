@@ -82,8 +82,10 @@ export async function searchPerplexity(params: {
   query: string;
   model?: keyof typeof PERPLEXITY_MODELS;
   maxTokens?: number;
+  /** Optional system prompt (from prompt store). */
+  systemPrompt?: string;
 }): Promise<PerplexitySearchResult> {
-  const { query, model = 'SONAR_PRO', maxTokens = 1000 } = params;
+  const { query, model = 'SONAR_PRO', maxTokens = 1000, systemPrompt } = params;
 
   console.log(`🔍 Searching Perplexity for: "${query.slice(0, 50)}..."`);
 
@@ -102,7 +104,7 @@ export async function searchPerplexity(params: {
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful research assistant that provides accurate, up-to-date information with citations.',
+            content: systemPrompt ?? 'You are a helpful research assistant that provides accurate, up-to-date information with citations.',
           },
           {
             role: 'user',
@@ -154,31 +156,39 @@ export async function searchPerplexity(params: {
 }
 
 /**
- * Discover trending topics in a specific domain
+ * Discover trending topics in a specific domain.
+ * When userQuery (and optionally systemPrompt) are provided, uses them; otherwise uses buildDiscoveryQuery (backward compat).
  */
 export async function discoverTopics(params: {
   domain: string;
   pillarContext?: string;
   count?: number;
+  /** Resolved system prompt (from prompt store). When set, used instead of default. */
+  systemPrompt?: string;
+  /** Resolved user query (from prompt store). When set, used instead of buildDiscoveryQuery. */
+  userQuery?: string;
+  profile?: any | null; // Profile context for targeted research
 }): Promise<ResearchResult> {
-  const { domain, pillarContext, count = 5 } = params;
+  const { domain, pillarContext, count = 5, systemPrompt, userQuery, profile } = params;
 
   console.log(`🔍 Discovering ${count} trending topics in "${domain}"`);
 
   const startTime = Date.now();
 
-  // Build research query
-  const query = buildDiscoveryQuery(domain, count, pillarContext);
+  const query = userQuery && userQuery.trim() ? userQuery.trim() : buildDiscoveryQuery(domain, count, pillarContext, profile);
 
-  // Search Perplexity
   const result = await searchPerplexity({
     query,
     model: 'SONAR_PRO',
     maxTokens: 2000,
+    systemPrompt: systemPrompt?.trim() || undefined,
   });
 
-  // Parse topics from content
-  const topics = parseTopicsFromContent(result.content, result.sources);
+  // Parse topics: try JSON first (when research prompt asks for JSON), else fall back to list parsing
+  let topics = tryParseTopicsJson(result.content, result.sources);
+  if (topics.length === 0) {
+    topics = parseTopicsFromContent(result.content, result.sources);
+  }
 
   const searchTime = Date.now() - startTime;
 
@@ -231,11 +241,49 @@ export async function researchTopic(params: {
 }
 
 /**
- * Build discovery query for trending topics
+ * Build discovery query for trending topics with profile awareness
  */
-function buildDiscoveryQuery(domain: string, count: number, pillarContext?: string): string {
+function buildDiscoveryQuery(domain: string, count: number, pillarContext?: string, profile?: any): string {
+  // TIER 1: High Context (Industry + Expertise)
+  if (profile?.industry && profile?.keyExpertise?.length > 0) {
+    const expertise = profile.keyExpertise.slice(0, 2).join(' and ');
+    const role = profile.currentRole || 'professional';
+
+    let query = `What are the top ${count} trending topics, news, and debates about ${domain} `;
+    query += `specifically for the ${profile.industry} industry right now? `;
+    query += `Focus on intersections with ${expertise}. `;
+
+    query += `Find topics where a ${role} with ${profile.yearsOfExperience || 'several'} years of experience would have credible, non-obvious insights. `;
+
+    query += `For each topic, provide:
+1. A specific, attention-grabbing title
+2. Why it's trending in ${profile.industry}
+3. Key data or recent event
+4. A content angle for a ${role}
+
+Format as a numbered list.`;
+    return query;
+  }
+
+  // TIER 2: Medium Context (Industry Only)
+  if (profile?.industry) {
+    let query = `What are the top ${count} trending topics about ${domain} `;
+    query += `specifically for ${profile.industry} professionals? `;
+
+    query += `Avoid generic advice. Focus on specific challenges, regulations, or trends in ${profile.industry}. `;
+
+    query += `For each topic, provide:
+1. Topic Title
+2. Relevance to ${profile.industry}
+3. Key discussion point
+
+Format as a numbered list.`;
+    return query;
+  }
+
+  // TIER 3: Low Context (Generic Fallback)
   let query = `What are the top ${count} trending topics, news, and discussions about ${domain} right now? `;
-  
+
   if (pillarContext) {
     query += `Focus on topics relevant to: ${pillarContext}. `;
   }
@@ -274,7 +322,29 @@ Be specific and cite recent sources.`;
 }
 
 /**
- * Parse topics from Perplexity content
+ * Try to parse research result as JSON array (title, summary, keyPoints, relevanceScore).
+ */
+function tryParseTopicsJson(content: string, sources: PerplexitySource[]): DiscoveredTopic[] {
+  const trimmed = content.trim().replace(/^```json?\s*|\s*```$/g, '').trim();
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(0, 10).map((item: any) => ({
+      content: item.title || item.content || String(item).slice(0, 200),
+      sources: sources.slice(0, 3),
+      relevanceScore: typeof item.relevanceScore === 'number' ? item.relevanceScore : 75,
+      trendingScore: 70,
+      summary: item.summary || item.content || '',
+      keyPoints: Array.isArray(item.keyPoints) ? item.keyPoints : [],
+      suggestedHashtags: [],
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Parse topics from Perplexity content (numbered list fallback)
  */
 function parseTopicsFromContent(content: string, sources: PerplexitySource[]): DiscoveredTopic[] {
   const topics: DiscoveredTopic[] = [];

@@ -22,6 +22,8 @@ const updatePillarSchema = z.object({
   tone: z.string().max(200).optional(),
   targetAudience: z.string().max(200).optional(),
   customPrompt: z.string().max(1000).optional(),
+  cta: z.string().max(500).optional(),
+  positioning: z.string().max(500).optional(),
   status: z.enum(['active', 'inactive']).optional(),
 });
 
@@ -55,12 +57,12 @@ export const GET = withAuth(async (req: NextRequest, { params, user }) => {
         .from(classifiedTopics)
         .where(eq(classifiedTopics.pillarId, id))
         .then(([result]) => result.count),
-      
+
       db.select({ count: sql<number>`count(*)::int` })
         .from(generatedDrafts)
         .where(eq(generatedDrafts.pillarId, id))
         .then(([result]) => result.count),
-      
+
       db.select({ count: sql<number>`count(*)::int` })
         .from(voiceExamples)
         .where(eq(voiceExamples.pillarId, id))
@@ -125,13 +127,29 @@ export const PATCH = withAuth(async (req: NextRequest, { params, user }) => {
       }
     }
 
-    // Generate new slug if name changed
-    const updateData: any = { ...data };
+    // Generate new slug if name changed; ensure unique per user (C3)
+    const updateData: Record<string, unknown> = { ...data };
     if (data.name) {
-      updateData.slug = data.name
+      const baseSlug = data.name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '_')
-        .replace(/^_+|_+$/g, '');
+        .replace(/^_+|_+$/g, '')
+        || 'pillar';
+      let slug = baseSlug;
+      let attempt = 0;
+      while (true) {
+        const existing = await db.query.pillars.findFirst({
+          where: and(
+            eq(pillars.userId, user.id),
+            eq(pillars.slug, slug)
+          ),
+          columns: { id: true },
+        });
+        if (!existing || existing.id === id) break;
+        attempt += 1;
+        slug = `${baseSlug}_${attempt}`;
+      }
+      updateData.slug = slug;
     }
 
     // Update pillar

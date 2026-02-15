@@ -8,10 +8,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { draftsApi } from '@/lib/api-client';
 import toast from 'react-hot-toast';
 
-export function useDrafts(params?: { status?: string; pillarId?: string; sort?: string; page?: number; limit?: number }) {
+export function useDrafts(
+  params?: { status?: string; pillarId?: string; topicId?: string; sort?: string; page?: number; limit?: number },
+  options?: { enabled?: boolean }
+) {
   return useQuery({
     queryKey: ['drafts', params],
     queryFn: () => draftsApi.list(params),
+    enabled: options?.enabled ?? true,
   });
 }
 

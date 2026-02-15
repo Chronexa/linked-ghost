@@ -14,8 +14,8 @@ export function useDiscoverTopics() {
   return useMutation({
     mutationFn: discoveryApi.discover,
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['topics'] });
-      toast.success(`Discovered ${data.data.topics.length} trending topics!`);
+      const count = data.data?.topics?.length ?? 0;
+      toast.success(`Found ${count} ideas! Select the ones you want to save.`);
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to discover topics');

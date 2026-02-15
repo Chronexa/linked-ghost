@@ -20,7 +20,7 @@ import { z } from 'zod';
 const researchSchema = z.object({
   topic: z.string().min(10).max(500),
   pillarId: z.string().uuid().optional(),
-  autoSave: z.boolean().optional().default(true),
+  autoSave: z.boolean().optional().default(false),
 });
 
 /**

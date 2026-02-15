@@ -27,6 +27,7 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status') || 'all';
     const pillarId = searchParams.get('pillarId');
+    const topicId = searchParams.get('topicId');
     const { page, limit, offset } = getPagination(req);
     const { sortBy, sortOrder } = getSorting(req, ['createdAt', 'updatedAt', 'approvedAt', 'scheduledFor']);
 
@@ -39,6 +40,10 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
 
     if (pillarId) {
       whereConditions.push(eq(generatedDrafts.pillarId, pillarId));
+    }
+
+    if (topicId) {
+      whereConditions.push(eq(generatedDrafts.topicId, topicId));
     }
 
     // Query drafts with related data
@@ -56,6 +61,7 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
         approvedAt: generatedDrafts.approvedAt,
         scheduledFor: generatedDrafts.scheduledFor,
         postedAt: generatedDrafts.postedAt,
+        qualityWarnings: generatedDrafts.qualityWarnings,
         pillarName: pillars.name,
         topicContent: classifiedTopics.content,
       })

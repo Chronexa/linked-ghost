@@ -59,7 +59,50 @@ export function withAuth(handler: AuthenticatedHandler) {
       });
 
       if (!dbUser) {
-        return errors.unauthorized('User not found in database');
+        // Auto-sync user from Clerk if missing (fixes dev environment issues)
+        console.log(`User ${clerkUserId} not found in DB. Syncing from Clerk...`);
+        try {
+          const { currentUser } = await import('@clerk/nextjs/server');
+          const clerkUser = await currentUser();
+
+          if (clerkUser) {
+            const email = clerkUser.emailAddresses[0]?.emailAddress;
+            const fullName = `${clerkUser.firstName} ${clerkUser.lastName}`.trim();
+
+            if (email) {
+              await db.insert(users).values({
+                id: clerkUserId,
+                email: email,
+                fullName: fullName || 'Unknown User',
+                avatarUrl: clerkUser.imageUrl,
+              }).onConflictDoNothing();
+
+              console.log(`User ${email} synced to DB.`);
+
+              // Retry fetching the user
+              const syncedUser = await db.query.users.findFirst({
+                where: eq(users.id, clerkUserId),
+                columns: {
+                  id: true,
+                  email: true,
+                  fullName: true,
+                  avatarUrl: true,
+                },
+              });
+
+              if (syncedUser) {
+                return await handler(req, {
+                  params: context.params,
+                  user: syncedUser,
+                });
+              }
+            }
+          }
+        } catch (syncError) {
+          console.error('Failed to sync user from Clerk:', syncError);
+        }
+
+        return errors.unauthorized('User not found in database and sync failed');
       }
 
       // Call the handler with authenticated user

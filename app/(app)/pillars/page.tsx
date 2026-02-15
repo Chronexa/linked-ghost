@@ -26,6 +26,8 @@ export default function PillarsPage() {
     description: '',
     tone: '',
     targetAudience: '',
+    cta: '',
+    positioning: '',
   });
 
   // Fetch pillars from API
@@ -51,7 +53,7 @@ export default function PillarsPage() {
 
       setShowForm(false);
       setEditingId(null);
-      setFormData({ name: '', description: '', tone: '', targetAudience: '' });
+      setFormData({ name: '', description: '', tone: '', targetAudience: '', cta: '', positioning: '' });
     } catch (error) {
       // Error handled by hooks
     }
@@ -64,6 +66,8 @@ export default function PillarsPage() {
       description: pillar.description || '',
       tone: pillar.tone || '',
       targetAudience: pillar.targetAudience || '',
+      cta: pillar.cta || '',
+      positioning: pillar.positioning || '',
     });
     setShowForm(true);
   };
@@ -93,30 +97,36 @@ export default function PillarsPage() {
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-12">
         <div>
-          <h1 className="font-display text-3xl font-bold text-charcoal">Content Pillars</h1>
-          <p className="text-charcoal-light mt-1">Organize your content by themes and topics</p>
+          <h1 className="font-display text-4xl font-bold text-charcoal tracking-tight">Content Pillars</h1>
+          <p className="text-charcoal-light mt-2 text-lg">Organize your content by themes and topics</p>
         </div>
         <Button
           onClick={() => {
             setShowForm(true);
             setEditingId(null);
-            setFormData({ name: '', description: '', tone: '', targetAudience: '' });
+            setFormData({ name: '', description: '', tone: '', targetAudience: '', cta: '', positioning: '' });
           }}
+          size="lg"
+          className="shadow-warm"
         >
           + Add Pillar
         </Button>
       </div>
 
       {/* Form Modal */}
+      {/* Form Modal */}
       {showForm && (
-        <Card className="mb-6 border-2 border-brand shadow-warm">
-          <CardHeader>
-            <CardTitle>{editingId ? 'Edit Pillar' : 'Create New Pillar'}</CardTitle>
+        <Card className="mb-8 border border-border/60 shadow-warm bg-surface/50 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <CardHeader className="pb-2">
+            <CardTitle className="font-display text-2xl">{editingId ? 'Edit Pillar' : 'Create New Pillar'}</CardTitle>
+            <p className="text-charcoal-light text-sm">
+              Define a core theme for your content strategy.
+            </p>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-6">
               <Input
                 label="Pillar Name"
                 type="text"
@@ -124,6 +134,7 @@ export default function PillarsPage() {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="e.g., AI Innovation, Founder Journey"
                 required
+                className="bg-background"
               />
 
               <Textarea
@@ -132,25 +143,51 @@ export default function PillarsPage() {
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="What topics does this pillar cover?"
                 rows={3}
+                className="bg-background"
               />
 
-              <Input
-                label="Tone & Style"
-                type="text"
-                value={formData.tone}
-                onChange={(e) => setFormData({ ...formData, tone: e.target.value })}
-                placeholder="e.g., professional, casual, inspiring"
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Input
+                  label="Content Voice"
+                  type="text"
+                  value={formData.tone}
+                  onChange={(e) => setFormData({ ...formData, tone: e.target.value })}
+                  placeholder="e.g., professional, casual"
+                  className="bg-background"
+                />
 
-              <Input
-                label="Target Audience"
-                type="text"
-                value={formData.targetAudience}
-                onChange={(e) => setFormData({ ...formData, targetAudience: e.target.value })}
-                placeholder="e.g., Tech founders, marketing professionals"
-              />
+                <Input
+                  label="Target Audience"
+                  type="text"
+                  value={formData.targetAudience}
+                  onChange={(e) => setFormData({ ...formData, targetAudience: e.target.value })}
+                  placeholder="e.g., Tech founders"
+                  className="bg-background"
+                />
 
-              <div className="flex items-center space-x-3 pt-4">
+                <Input
+                  label="Positioning"
+                  type="text"
+                  value={formData.positioning}
+                  onChange={(e) => setFormData({ ...formData, positioning: e.target.value })}
+                  placeholder="e.g., The Expert"
+                  className="bg-background"
+                />
+
+                <Input
+                  label="Ending CTA"
+                  type="text"
+                  value={formData.cta}
+                  onChange={(e) => setFormData({ ...formData, cta: e.target.value })}
+                  placeholder="e.g., Subscribe to newsletter"
+                  className="bg-background"
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-border/50">
+                <Button type="button" onClick={() => setShowForm(false)} variant="secondary">
+                  Cancel
+                </Button>
                 <Button
                   type="submit"
                   disabled={createPillar.isPending || updatePillar.isPending}
@@ -158,11 +195,8 @@ export default function PillarsPage() {
                   {createPillar.isPending || updatePillar.isPending
                     ? 'Saving...'
                     : editingId
-                    ? 'Update Pillar'
-                    : 'Create Pillar'}
-                </Button>
-                <Button type="button" onClick={() => setShowForm(false)} variant="secondary">
-                  Cancel
+                      ? 'Update Pillar'
+                      : 'Create Pillar'}
                 </Button>
               </div>
             </form>
@@ -181,92 +215,97 @@ export default function PillarsPage() {
 
       {/* Pillars Grid */}
       {!isLoading && pillars.length > 0 && (
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {pillars.map((pillar: any) => (
-            <Card key={pillar.id} hover>
-              <CardHeader>
-                <div className="flex items-center justify-between">
+            <Card key={pillar.id} className="group hover:shadow-warm hover:border-primary/20 transition-all duration-300 flex flex-col h-full bg-card/50 hover:bg-card hover:-translate-y-1">
+              <CardHeader className="pb-4">
+                <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-3">
-                    <CardTitle className="text-lg">{pillar.name}</CardTitle>
+                    <CardTitle className="text-xl font-display font-bold">{pillar.name}</CardTitle>
                     <Badge variant={pillar.status === 'active' ? 'success' : 'neutral'}>
                       {pillar.status}
                     </Badge>
                   </div>
                 </div>
                 {pillar.description && (
-                  <p className="text-charcoal-light text-sm mt-2">{pillar.description}</p>
+                  <p className="text-charcoal-light text-sm leading-relaxed">{pillar.description}</p>
                 )}
               </CardHeader>
-              <CardContent>
-                {pillar.tone && (
-                  <div className="mb-3">
-                    <label className="text-xs font-medium text-charcoal-light">Tone:</label>
-                    <p className="text-sm text-charcoal mt-1">{pillar.tone}</p>
-                  </div>
-                )}
+              <CardContent className="flex-grow flex flex-col justify-between">
+                <div className="space-y-4 mb-6">
+                  {pillar.tone && (
+                    <div>
+                      <label className="text-xs font-semibold text-charcoal-light uppercase tracking-wider">Content Voice</label>
+                      <p className="text-sm text-charcoal mt-1 line-clamp-2">{pillar.tone}</p>
+                    </div>
+                  )}
 
-                {pillar.targetAudience && (
-                  <div className="mb-4">
-                    <label className="text-xs font-medium text-charcoal-light">
-                      Target Audience:
-                    </label>
-                    <p className="text-sm text-charcoal mt-1">{pillar.targetAudience}</p>
-                  </div>
-                )}
+                  {pillar.targetAudience && (
+                    <div>
+                      <label className="text-xs font-semibold text-charcoal-light uppercase tracking-wider">
+                        Target Audience
+                      </label>
+                      <p className="text-sm text-charcoal mt-1 line-clamp-2">{pillar.targetAudience}</p>
+                    </div>
+                  )}
 
-                <div className="flex items-center justify-between pt-4 border-t border-border">
-                  <div className="text-sm text-charcoal-light">
-                    <span className="font-semibold text-charcoal">{pillar.postsCount || 0}</span>{' '}
-                    posts
+                  {pillar.positioning && (
+                    <div>
+                      <label className="text-xs font-semibold text-charcoal-light uppercase tracking-wider">
+                        Positioning
+                      </label>
+                      <p className="text-sm text-charcoal mt-1 line-clamp-2">{pillar.positioning}</p>
+                    </div>
+                  )}
+
+                  {pillar.cta && (
+                    <div>
+                      <label className="text-xs font-semibold text-charcoal-light uppercase tracking-wider">
+                        Ending CTA
+                      </label>
+                      <p className="text-sm text-charcoal mt-1 line-clamp-2">{pillar.cta}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-border/50 mt-auto">
+                  <div className="text-xs font-medium text-charcoal-light bg-secondary/50 px-2.5 py-1 rounded-md">
+                    <span className="font-bold text-primary">{pillar.postsCount || 0}</span> posts
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <button
+                  <div className="flex items-center gap-1">
+                    <Button
                       onClick={() => handleToggleStatus(pillar)}
-                      className="p-2 text-charcoal-light hover:text-success hover:bg-success/5 rounded transition"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-success hover:bg-success/10"
                       title={pillar.status === 'active' ? 'Deactivate' : 'Activate'}
-                      aria-label={
-                        pillar.status === 'active' ? 'Deactivate pillar' : 'Activate pillar'
-                      }
                       disabled={updatePillar.isPending}
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13 10V3L4 14h7v7l9-11h-7z"
-                        />
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => handleEdit(pillar)}
-                      className="p-2 text-charcoal-light hover:text-brand hover:bg-brand/5 rounded transition"
-                      aria-label="Edit pillar"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-primary hover:bg-primary/10"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                        />
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => handleDelete(pillar.id)}
-                      className="p-2 text-charcoal-light hover:text-error hover:bg-error/5 rounded transition"
-                      aria-label="Delete pillar"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                       disabled={deletePillar.isPending}
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                        />
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </CardContent>

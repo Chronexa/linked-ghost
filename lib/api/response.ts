@@ -114,6 +114,9 @@ export const responses = {
   // 201 Created
   created: <T>(data: T) => success(data, 201),
 
+  // 202 Accepted
+  accepted: <T>(data: T) => success(data, 202),
+
   // 204 No Content
   noContent: () =>
     new NextResponse(null, { status: 204 }),

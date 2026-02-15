@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Card, CardContent, Input, Textarea } from '@/components/ui';
+import { usePillars } from '@/lib/hooks/use-pillars';
+import { useCreateTopic, useClassifyTopic } from '@/lib/hooks/use-topics';
 
 export default function NewTopicPage() {
   const router = useRouter();
@@ -14,21 +16,54 @@ export default function NewTopicPage() {
     pillarId: '',
   });
 
-  const pillars = [
-    { id: '1', name: 'AI Innovation' },
-    { id: '2', name: 'Leadership' },
-    { id: '3', name: 'Productivity' },
-    { id: '4', name: 'Founder Journey' },
-  ];
+  // Load real pillars for the current user
+  const { data: pillarsData, isLoading: pillarsLoading } = usePillars({ status: 'active' });
+  const pillars = pillarsData?.data?.data || [];
+
+  const createTopic = useCreateTopic();
+  const classifyTopic = useClassifyTopic();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (formData.content.trim().length < 50) {
+      return;
+    }
+
     setIsSubmitting(true);
-    
-    setTimeout(() => {
-      setIsSubmitting(false);
+
+    try {
+      // If user selected a pillar, create a classified topic directly
+      if (formData.pillarId) {
+        await createTopic.mutateAsync({
+          content: formData.content,
+          sourceUrl: formData.url || undefined,
+          pillarId: formData.pillarId,
+        });
+        router.push('/topics');
+        return;
+      }
+
+      // Otherwise, create a raw topic and immediately classify it
+      const result: any = await createTopic.mutateAsync({
+        content: formData.content,
+        sourceUrl: formData.url || undefined,
+      });
+
+      const rawTopic = result?.data;
+      if (rawTopic && rawTopic.id) {
+        await classifyTopic.mutateAsync({
+          rawTopicId: rawTopic.id,
+          topicContent: rawTopic.content,
+          sourceUrl: rawTopic.sourceUrl || undefined,
+          autoApprove: true,
+        } as any);
+      }
+
       router.push('/topics');
-    }, 2000);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -45,16 +80,16 @@ export default function NewTopicPage() {
       </Link>
 
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="font-display text-3xl font-bold text-charcoal">Add Manual Topic</h1>
-        <p className="text-charcoal-light mt-2">
+      <div className="mb-10">
+        <h1 className="font-display text-4xl font-bold text-charcoal tracking-tight">Add Manual Topic</h1>
+        <p className="text-charcoal-light mt-3 text-lg leading-relaxed">
           Add a custom topic or news item to generate posts from
         </p>
       </div>
 
       {/* Form */}
-      <Card>
-        <CardContent className="p-6">
+      <Card className="border border-border/60 shadow-warm bg-surface/50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <CardContent className="p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             <Textarea
               label="Topic Content"
@@ -85,7 +120,7 @@ export default function NewTopicPage() {
                 className="select"
               >
                 <option value="">Let AI classify automatically</option>
-                {pillars.map((pillar) => (
+                {pillars.map((pillar: any) => (
                   <option key={pillar.id} value={pillar.id}>
                     {pillar.name}
                   </option>
@@ -96,9 +131,9 @@ export default function NewTopicPage() {
               </p>
             </div>
 
-            <Card className="bg-brand/5 border-brand/20">
-              <CardContent className="p-4">
-                <p className="text-sm text-charcoal-light">
+            <Card className="bg-brand/5 border-brand/20 shadow-sm">
+              <CardContent className="p-5">
+                <p className="text-sm text-charcoal-light leading-relaxed">
                   <span className="font-semibold text-brand-text">ℹ️ How it works:</span> Once submitted, AI will
                   analyze this topic, assign it a quality score, suggest a hook angle, and classify it
                   under a content pillar. You can then generate post variants from it.
@@ -127,8 +162,8 @@ export default function NewTopicPage() {
       </Card>
 
       {/* Help Section */}
-      <Card className="mt-8 bg-background">
-        <CardContent className="p-6">
+      <Card className="mt-8 bg-surface border border-border/60 shadow-sm">
+        <CardContent className="p-8">
           <h3 className="font-semibold text-charcoal mb-4">💡 Tips for great topics</h3>
           <ul className="space-y-3 text-sm text-charcoal-light">
             <li className="flex items-start">

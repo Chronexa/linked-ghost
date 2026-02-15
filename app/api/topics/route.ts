@@ -19,6 +19,7 @@ const createTopicSchema = z.object({
   content: z.string().min(50, 'Content must be at least 50 characters').max(5000, 'Content must be at most 5000 characters'),
   sourceUrl: z.string().url('Invalid URL').optional(),
   pillarId: z.string().uuid('Invalid pillar ID').optional(),
+  source: z.enum(['manual', 'perplexity', 'reddit', 'fireflies']).optional(),
 });
 
 /**
@@ -154,7 +155,7 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
       .insert(rawTopics)
       .values({
         userId: user.id,
-        source: 'manual',
+        source: data.source || 'manual',
         sourceUrl: data.sourceUrl || null,
         content: data.content,
         status: 'new',

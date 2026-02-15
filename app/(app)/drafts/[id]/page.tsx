@@ -1,278 +1,343 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Button, Card, CardContent, CardHeader, CardTitle, Textarea, Badge } from '@/components/ui';
-
-// Mock data
-const mockDraft = {
-  id: '1',
-  topicId: 't1',
-  topic: {
-    content:
-      'AI agents are transforming customer service by reducing response times by 60%. Companies using AI-powered support see significant improvements.',
-    url: 'https://example.com/ai-customer-service',
-  },
-  variantLetter: 'A',
-  fullText:
-    "AI agents aren't just the future—they're already here, revolutionizing customer service.\n\nCompanies using AI-powered support are seeing response times drop by 60%.\n\nBut here's what most people miss:\nIt's not about replacing humans. It's about empowering them to focus on complex problems that truly need human touch.\n\nThe best teams use AI to handle repetitive queries while their people tackle the interesting challenges.\n\nWhat's your take on AI in customer service? 🤔\n\n#AI #CustomerService #Innovation",
-  characterCount: 447,
-  status: 'draft' as const,
-  pillarName: 'AI Innovation',
-  createdAt: '2026-02-09T08:30:00Z',
-};
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useDraft, useUpdateDraft, useApproveDraft, useScheduleDraft, useDrafts } from '@/lib/hooks/use-drafts';
+import { cn } from '@/lib/utils';
+import { toast } from 'react-hot-toast';
+import { Copy, Check, ChevronLeft, Calendar, FileText } from 'lucide-react';
 
 export default function DraftEditorPage() {
-  const params = useParams();
+  const params = useParams() as { id: string };
+  const draftId = params.id;
   const router = useRouter();
-  const [editedText, setEditedText] = useState(mockDraft.fullText);
-  const [notes, setNotes] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [showScheduler, setShowScheduler] = useState(false);
 
-  const characterCount = editedText.length;
-  const isLinkedInOptimal = characterCount >= 800 && characterCount <= 1300;
-  const isTooLong = characterCount > 3000;
+  const { data, isLoading } = useDraft(draftId);
+  const payload: any = data?.data;
+  const currentDraft = payload?.draft;
+  const topic = payload?.topic;
+  const pillarName = payload?.pillarName;
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
-    }, 1000);
+  const { data: siblingsData } = useDrafts(
+    currentDraft?.topicId ? { topicId: currentDraft.topicId, limit: 10 } : undefined,
+    { enabled: !!currentDraft?.topicId }
+  );
+  const siblings = useMemo(() => (siblingsData as any)?.data ?? [], [siblingsData]);
+  const variants = ['A', 'B', 'C'].map((letter) =>
+    siblings.find((d: any) => (d.variantLetter || '').toUpperCase() === letter)
+  ).filter(Boolean);
+
+  const hasThreeVariants = variants.length >= 2;
+
+  const updateDraft = useUpdateDraft();
+  const approveDraft = useApproveDraft();
+  const scheduleDraft = useScheduleDraft();
+
+  const [editedByVariant, setEditedByVariant] = useState<Record<string, string>>({});
+  const [notesByVariant, setNotesByVariant] = useState<Record<string, string>>({});
+  const [scheduledFor, setScheduledFor] = useState('');
+  const [showSchedulerFor, setShowSchedulerFor] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!currentDraft) return;
+    const text = currentDraft.editedText || currentDraft.fullText || '';
+    const notes = currentDraft.feedbackNotes || '';
+    setEditedByVariant((prev) => ({ ...prev, [currentDraft.id]: text }));
+    setNotesByVariant((prev) => ({ ...prev, [currentDraft.id]: notes }));
+  }, [currentDraft]);
+
+  useEffect(() => {
+    siblings.forEach((d: any) => {
+      if (!d) return;
+      const text = d.editedText || d.fullText || '';
+      const notes = d.feedbackNotes || '';
+      setEditedByVariant((prev) => ({ ...prev, [d.id]: prev[d.id] ?? text }));
+      setNotesByVariant((prev) => ({ ...prev, [d.id]: prev[d.id] ?? notes }));
+    });
+  }, [siblings]);
+
+  const handleSave = async (id: string) => {
+    const text = editedByVariant[id];
+    if (text == null) return;
+    await updateDraft.mutateAsync({
+      id,
+      data: { fullText: text, feedbackNotes: notesByVariant[id] || undefined },
+    });
+    toast.success('Saved changes');
   };
 
-  const handleApprove = async () => {
+  const handleApprove = async (id: string) => {
+    await approveDraft.mutateAsync(id);
+    toast.success('Draft approved');
     router.push('/drafts');
   };
 
-  const handleReject = async () => {
+  const handleReject = async (id: string) => {
+    await updateDraft.mutateAsync({ id, data: { status: 'rejected' } });
+    toast.success('Draft rejected');
     router.push('/drafts');
   };
+
+  const handleSchedule = async (id: string) => {
+    if (!scheduledFor) return;
+    await scheduleDraft.mutateAsync({ id, scheduledFor });
+    setShowSchedulerFor(null);
+    toast.success('Scheduled successfully');
+  };
+
+  if (isLoading || !currentDraft) {
+    return (
+      <div className="space-y-6">
+        <p className="text-muted-foreground">Loading…</p>
+      </div>
+    );
+  }
+
+  const contextTopic = topic?.content;
+  const contextPillar = pillarName;
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
-      {/* Back Button */}
+    <div className="space-y-6">
       <Link
         href="/drafts"
-        className="inline-flex items-center text-charcoal-light hover:text-charcoal mb-6 transition font-medium"
+        className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring rounded"
       >
-        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to Drafts
+        <ChevronLeft className="w-4 h-4 mr-2" />
+        Back to Generated
       </Link>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Left Column - Editor */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-brand rounded-xl flex items-center justify-center">
-                    <span className="text-white font-display font-bold">
-                      {mockDraft.variantLetter}
-                    </span>
-                  </div>
-                  <div>
-                    <CardTitle>Variant {mockDraft.variantLetter}</CardTitle>
-                    <Badge variant="success" className="mt-1">
-                      {mockDraft.pillarName}
-                    </Badge>
-                  </div>
-                </div>
-                <Button
-                  onClick={handleSave}
-                  isLoading={isSaving}
-                  loadingText="Saving..."
-                  variant="secondary"
-                  size="sm"
-                >
-                  Save Changes
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                label="Post Content"
-                value={editedText}
-                onChange={(e) => setEditedText(e.target.value)}
-                rows={15}
-                placeholder="Edit your LinkedIn post here..."
-                className="font-sans"
-              />
-
-              {/* Character Count */}
-              <div className="flex items-center justify-between mt-3 text-sm">
-                <div className="flex items-center space-x-4">
-                  <span
-                    className={`font-medium ${
-                      isLinkedInOptimal
-                        ? 'text-success'
-                        : isTooLong
-                        ? 'text-error'
-                        : 'text-charcoal-light'
-                    }`}
-                  >
-                    {characterCount} characters
-                  </span>
-                  {isLinkedInOptimal && (
-                    <span className="text-success text-xs font-medium">✓ Optimal length</span>
-                  )}
-                  {isTooLong && (
-                    <span className="text-error text-xs font-medium">⚠ Too long</span>
-                  )}
-                </div>
-                <div className="text-charcoal-light text-xs">
-                  LinkedIn max: 3,000 • Optimal: 800-1,300
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div className="mt-6">
-                <Textarea
-                  label="Notes (optional)"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  placeholder="Add notes or feedback about this draft..."
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Action Buttons */}
-          <div className="flex items-center justify-between mt-6">
-            <Button
-              onClick={handleReject}
-              variant="secondary"
-              className="border-error text-error hover:bg-error/5"
-            >
-              Reject Draft
-            </Button>
-            <div className="flex items-center space-x-3">
-              <Button
-                onClick={() => setShowScheduler(!showScheduler)}
-                variant="secondary"
-              >
-                Schedule for Later
-              </Button>
-              <Button onClick={handleApprove} size="lg">
-                Approve & Publish
-              </Button>
-            </div>
-          </div>
-
-          {/* Scheduler */}
-          {showScheduler && (
-            <Card className="mt-4 bg-brand/5 border-brand/20">
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-4">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-charcoal mb-2">
-                      Schedule Date & Time
-                    </label>
-                    <input
-                      type="datetime-local"
-                      className="input"
-                    />
-                  </div>
-                  <Button size="sm" className="mt-6">
-                    Schedule
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Right Column - Info */}
-        <div className="space-y-6">
-          {/* Original Topic */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Original Topic</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-charcoal-light leading-relaxed mb-3">
-                {mockDraft.topic.content}
-              </p>
-              {mockDraft.topic.url && (
+      {/* Context card: source topic + pillar */}
+      {(contextTopic || contextPillar) && (
+        <Card className="bg-card border-border">
+          <CardContent className="py-4">
+            <div className="flex flex-wrap items-start gap-4">
+              {contextPillar && (
+                <Badge variant="outline" className="border-border text-muted-foreground">{contextPillar}</Badge>
+              )}
+              {contextTopic && (
+                <p className="text-sm text-muted-foreground flex-1 min-w-0 line-clamp-2">
+                  <span className="font-medium text-foreground mr-1">Topic:</span>
+                  {contextTopic}
+                </p>
+              )}
+              {topic?.sourceUrl && (
                 <a
-                  href={mockDraft.topic.url}
+                  href={topic.sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-brand-text hover:text-brand truncate block"
+                  className="text-sm text-brand hover:underline shrink-0"
                 >
-                  View source →
+                  Source →
                 </a>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-          {/* AI Suggestions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">AI Suggestions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-charcoal-light">Hook Type:</span>
-                  <span className="font-medium text-charcoal">Opening Question</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-charcoal-light">Tone:</span>
-                  <span className="font-medium text-charcoal">Conversational</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-charcoal-light">Best Time:</span>
-                  <span className="font-medium text-charcoal">Tue 9-11 AM</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Draft Variants */}
+      {hasThreeVariants ? (
+        <>
+          {/* Mobile: Tabs */}
+          <div className="md:hidden">
+            <Tabs defaultValue={variants[0]?.variantLetter || 'A'} className="w-full">
+              <TabsList className="grid w-full grid-cols-3 mb-4">
+                {variants.map((variant: any) => (
+                  <TabsTrigger key={variant.id} value={variant.variantLetter}>
+                    Variant {variant.variantLetter}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              {variants.map((variant: any) => (
+                <TabsContent key={variant.id} value={variant.variantLetter}>
+                  <DraftVariantCard
+                    draft={variant}
+                    text={editedByVariant[variant.id] ?? ''}
+                    setText={(val) => setEditedByVariant((prev) => ({ ...prev, [variant.id]: val }))}
+                    onSave={() => handleSave(variant.id)}
+                    onApprove={() => handleApprove(variant.id)}
+                    onReject={() => handleReject(variant.id)}
+                    onSchedule={(date) => { setScheduledFor(date); handleSchedule(variant.id); }}
+                    isPending={updateDraft.isPending || approveDraft.isPending}
+                  />
+                </TabsContent>
+              ))}
+            </Tabs>
+          </div>
 
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <button className="w-full px-4 py-2.5 bg-background text-charcoal rounded-lg text-sm font-medium hover:bg-border/20 transition text-left flex items-center">
-                  <span className="mr-2">↻</span> Regenerate with different tone
-                </button>
-                <button className="w-full px-4 py-2.5 bg-background text-charcoal rounded-lg text-sm font-medium hover:bg-border/20 transition text-left flex items-center">
-                  <span className="mr-2">📋</span> Copy to clipboard
-                </button>
-                <button className="w-full px-4 py-2.5 bg-background text-charcoal rounded-lg text-sm font-medium hover:bg-border/20 transition text-left flex items-center">
-                  <span className="mr-2">📊</span> Preview engagement
-                </button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Version History */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Version History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-charcoal-light">Current version</span>
-                  <span className="text-charcoal font-medium">v1</span>
-                </div>
-                <div className="text-xs text-charcoal-light">
-                  Created {new Date(mockDraft.createdAt).toLocaleString()}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Desktop: Grid */}
+          <div className="hidden md:grid md:grid-cols-3 gap-6">
+            {variants.map((variant: any) => (
+              <DraftVariantCard
+                key={variant.id}
+                draft={variant}
+                text={editedByVariant[variant.id] ?? ''}
+                setText={(val) => setEditedByVariant((prev) => ({ ...prev, [variant.id]: val }))}
+                onSave={() => handleSave(variant.id)}
+                onApprove={() => handleApprove(variant.id)}
+                onReject={() => handleReject(variant.id)}
+                onSchedule={(date) => { setScheduledFor(date); handleSchedule(variant.id); }}
+                isPending={updateDraft.isPending || approveDraft.isPending}
+              />
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="max-w-2xl mx-auto">
+          <DraftVariantCard
+            draft={currentDraft}
+            text={editedByVariant[currentDraft.id] ?? ''}
+            setText={(val) => setEditedByVariant((prev) => ({ ...prev, [currentDraft.id]: val }))}
+            onSave={() => handleSave(currentDraft.id)}
+            onApprove={() => handleApprove(currentDraft.id)}
+            onReject={() => handleReject(currentDraft.id)}
+            onSchedule={(date) => { setScheduledFor(date); handleSchedule(currentDraft.id); }}
+            isPending={updateDraft.isPending || approveDraft.isPending}
+            singleMode
+          />
         </div>
-      </div>
+      )}
     </div>
+  );
+}
+
+function DraftVariantCard({
+  draft,
+  text,
+  setText,
+  onSave,
+  onApprove,
+  onReject,
+  onSchedule,
+  isPending,
+  singleMode = false
+}: {
+  draft: any,
+  text: string,
+  setText: (s: string) => void,
+  onSave: () => void,
+  onApprove: () => void,
+  onReject: () => void,
+  onSchedule: (date: string) => void,
+  isPending: boolean,
+  singleMode?: boolean
+}) {
+  const [showScheduler, setShowScheduler] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const charCount = text.length;
+  const isOptimal = charCount >= 800 && charCount <= 1300;
+  const isTooLong = charCount > 3000;
+
+  return (
+    <Card className="flex flex-col min-h-0 h-full">
+      <CardHeader className="shrink-0 pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-brand/10 text-brand flex items-center justify-center">
+              <span className="font-display font-bold text-sm">
+                {draft.variantLetter}
+              </span>
+            </div>
+            {!singleMode && <CardTitle className="text-base">Variant {draft.variantLetter}</CardTitle>}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+              title="Copy to clipboard"
+              onClick={() => {
+                navigator.clipboard.writeText(text);
+                toast.success('Copied to clipboard');
+              }}
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+            <Badge variant={isTooLong ? 'destructive' : isOptimal ? 'success' : 'outline'} className={cn(!isOptimal && !isTooLong && "text-muted-foreground font-normal")}>
+              {charCount} / 3000
+            </Badge>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col flex-1 min-h-0 p-0">
+        <div className="px-6 pb-4 flex-1 min-h-0">
+          <Textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={12}
+            placeholder="Post content…"
+            className="border resize-none shadow-sm focus-visible:ring-2 focus-visible:ring-ring min-h-[300px] text-base leading-relaxed p-4 rounded-md"
+          />
+        </div>
+        <div className="px-6 py-4 border-t border-border space-y-3 bg-muted/5">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onSave}
+              disabled={isPending}
+            >
+              Save
+            </Button>
+
+            {draft.status === 'draft' && (
+              <>
+                <Button
+                  size="sm"
+                  onClick={onApprove}
+                  disabled={isPending}
+                  className="gap-1.5"
+                >
+                  <Check className="h-4 w-4" />
+                  Approve
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowScheduler(true)}
+                  disabled={isPending}
+                  className="text-muted-foreground"
+                >
+                  <Calendar className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive ml-auto"
+                  onClick={onReject}
+                  disabled={isPending}
+                >
+                  Reject
+                </Button>
+              </>
+            )}
+          </div>
+          {showScheduler && (
+            <div className="flex items-center gap-2 pt-2 animate-in slide-in-from-top-2">
+              <input
+                type="datetime-local"
+                className="input text-sm flex-1 h-9"
+                value={scheduleDate}
+                onChange={(e) => setScheduleDate(e.target.value)}
+                aria-label="Schedule date and time"
+              />
+              <Button size="sm" onClick={() => onSchedule(scheduleDate)}>
+                Schedule
+              </Button>
+              <button
+                type="button"
+                className="text-sm text-muted-foreground hover:text-foreground px-2"
+                onClick={() => setShowScheduler(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

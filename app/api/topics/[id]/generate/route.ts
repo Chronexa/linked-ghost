@@ -1,21 +1,33 @@
 /**
  * Topic Generation API
- * POST /api/topics/:id/generate - Generate 3 draft variants from a topic using GPT-4o
+ * POST /api/topics/:id/generate - Generate 2 draft variants from a topic using GPT-4o
  */
 
 import { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/with-auth';
 import { responses, errors } from '@/lib/api/response';
+import { validateBody } from '@/lib/api/validate';
 import { rateLimit } from '@/lib/api/rate-limit';
 import { db } from '@/lib/db';
 import { classifiedTopics, generatedDrafts, voiceExamples, pillars, profiles } from '@/lib/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { generateDraftVariants, estimateEngagement } from '@/lib/ai/generation';
+import { z } from 'zod';
+import { retry, isRetryableError } from '@/lib/utils/retry';
+import { enqueueGeneration } from '@/lib/queue';
+import { checkUsageLimit, incrementUsage } from '@/lib/ai/usage';
+
+// Validation schema
+const generateSchema = z.object({
+  userPerspective: z.string()
+    .min(50, 'User perspective must be at least 50 characters')
+    .max(500, 'User perspective must be less than 500 characters'), // Align with frontend
+  pillarId: z.string().uuid().optional(),
+});
 
 /**
  * POST /api/topics/:id/generate
- * Generate 3 draft variants (A, B, C) from a classified topic
- * This is a simplified version - full implementation will use OpenAI
+ * Generate 2 draft variants (A, B) from a classified topic with user perspective
  */
 export const POST = withAuth(async (req: NextRequest, { params, user }) => {
   try {
@@ -24,6 +36,18 @@ export const POST = withAuth(async (req: NextRequest, { params, user }) => {
     if (limited) return limited;
 
     const { id: topicId } = params;
+
+    // Check usage limits
+    const usageCheck = await checkUsageLimit(user.id, 'generate_post');
+    if (!usageCheck.allowed) {
+      return errors.rateLimit(`Usage limit reached for your ${usageCheck.plan} plan. Please upgrade to generate more posts.`);
+    }
+
+    // Validate request body
+    const validation = await validateBody(req, generateSchema);
+    if (!validation.success) return validation.error;
+
+    const { userPerspective, pillarId: requestedPillarId } = validation.data;
 
     // Get topic
     const topic = await db.query.classifiedTopics.findFirst({
@@ -37,25 +61,38 @@ export const POST = withAuth(async (req: NextRequest, { params, user }) => {
       return errors.notFound('Topic');
     }
 
+    // Use requested pillarId or fall back to topic's pillarId
+    const effectivePillarId = requestedPillarId || topic.pillarId;
+
     // Get pillar for context
     const pillar = await db.query.pillars.findFirst({
-      where: eq(pillars.id, topic.pillarId),
+      where: eq(pillars.id, effectivePillarId),
     });
 
     // Get voice examples (3-10 examples, preferably from same pillar)
-    const examples = await db
+    // Get voice examples (application-level sorting to prevent SQL injection)
+    const allExamples = await db
       .select()
       .from(voiceExamples)
       .where(and(
         eq(voiceExamples.userId, user.id),
         eq(voiceExamples.status, 'active')
       ))
-      .orderBy(
+      .limit(20); // Get more than needed for sorting
+
+    // Sort: same pillar first, then by date (application-level)
+    const examples = allExamples
+      .sort((a, b) => {
         // Prioritize examples from same pillar
-        sql`CASE WHEN ${voiceExamples.pillarId} = ${topic.pillarId} THEN 0 ELSE 1 END`,
-        sql`${voiceExamples.createdAt} desc`
-      )
-      .limit(10);
+        const aPriority = a.pillarId === effectivePillarId ? 0 : 1;
+        const bPriority = b.pillarId === effectivePillarId ? 0 : 1;
+
+        if (aPriority !== bPriority) return aPriority - bPriority;
+
+        // Within same priority, sort by date (newer first)
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      })
+      .slice(0, 10); // Take top 10 after sorting
 
     if (examples.length < 3) {
       return errors.badRequest('You need at least 3 voice training examples to generate posts. Please add more examples in Voice Training.');
@@ -70,79 +107,43 @@ export const POST = withAuth(async (req: NextRequest, { params, user }) => {
       return errors.badRequest('Voice profile not trained. Please analyze your voice first in Voice Training.');
     }
 
-    console.log(`🚀 Generating drafts for topic: ${topic.content}`);
-
-    // Call OpenAI to generate 3 variants
-    const result = await generateDraftVariants({
-      topicTitle: topic.content,
-      topicDescription: topic.sourceUrl || undefined,
-      pillarName: pillar?.name || 'General',
-      pillarDescription: pillar?.description || undefined,
-      pillarTone: pillar?.tone || undefined,
-      targetAudience: pillar?.targetAudience || profile.targetAudience || undefined,
-      customPrompt: pillar?.customPrompt || undefined,
+    // Enqueue generation job
+    const jobId = `gen-${topic.id}-${Date.now()}`;
+    await enqueueGeneration({
+      userId: user.id,
+      topicId: topic.id,
+      pillarId: effectivePillarId,
+      pillarContext: {
+        name: pillar?.name || 'General',
+        description: pillar?.description,
+        tone: pillar?.tone,
+        targetAudience: pillar?.targetAudience || profile.targetAudience,
+        customPrompt: pillar?.customPrompt,
+      },
+      topicContent: {
+        title: topic.content,
+        summary: topic.sourceUrl, // Using sourceUrl as summary/description proxy if needed, or pass full content
+      },
       voiceExamples: examples.map((ex) => ({
         postText: ex.postText,
-        embedding: ex.embedding as number[] | undefined,
+        embedding: ex.embedding,
       })),
-      masterVoiceEmbedding: profile.voiceEmbedding as number[],
+      userPerspective,
+      jobId,
     });
 
-    // Prepare drafts for database insertion
-    const draftsToInsert = result.variants.map((variant) => {
-      const engagement = estimateEngagement(variant.post);
+    console.log(`✅ Enqueued draft generation job: ${jobId}`);
 
-      return {
-        userId: user.id,
-        topicId: topic.id,
-        pillarId: topic.pillarId,
-        variantLetter: variant.variantLetter,
-        fullText: variant.post.fullText,
-        hook: variant.post.hook,
-        body: variant.post.body,
-        cta: variant.post.cta,
-        hashtags: variant.post.hashtags,
-        characterCount: variant.post.characterCount,
-        estimatedEngagement: engagement,
-        status: 'draft' as const,
-      };
-    });
+    // Increment usage (2 variants)
+    await incrementUsage(user.id, 'generate_post', 2);
 
-    // Insert all drafts
-    const createdDrafts = await db
-      .insert(generatedDrafts)
-      .values(draftsToInsert)
-      .returning();
-
-    console.log(`✅ Generated ${createdDrafts.length} drafts successfully`);
-
-    return responses.created({
-      message: '3 draft variants generated successfully using GPT-4o',
-      drafts: createdDrafts.map((draft, index) => ({
-        ...draft,
-        voiceMatchScore: result.variants[index].voiceMatchScore,
-        style: result.variants[index].style,
-      })),
-      topic: {
-        id: topic.id,
-        content: topic.content,
-        pillarName: pillar?.name,
-      },
-      metadata: result.metadata,
+    return responses.accepted({
+      message: 'Draft generation started in background. We will notify you when it is ready.',
+      jobId,
+      status: 'processing'
     });
   } catch (error) {
-    console.error('Error generating drafts:', error);
-    
-    // Provide helpful error message
-    if (error instanceof Error) {
-      if (error.message.includes('API key')) {
-        return errors.internal('OpenAI API key is invalid or missing');
-      }
-      if (error.message.includes('rate limit')) {
-        return errors.rateLimit('OpenAI rate limit exceeded. Please try again in a few moments.');
-      }
-    }
-    
-    return errors.internal('Failed to generate drafts. Please try again.');
+    console.error('Error queuing draft generation:', error);
+    return errors.internal('Failed to start draft generation');
   }
 });

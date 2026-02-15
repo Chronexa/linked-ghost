@@ -3,140 +3,172 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --background: 48 100% 97%;
+    /* #FFFCF2 - Cream/Off-white */
+    --foreground: 240 5% 11%;
+    /* #1A1A1D - Charcoal */
+
+    --card: 0 0% 100%;
+    /* #FFFFFF */
+    --card-foreground: 240 5% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 5% 11%;
+
+    --primary: 14 61% 47%;
+    /* #C1502E - Burnt Orange */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 40 20% 96%;
+    /* Neutral background for secondary elements */
+    --secondary-foreground: 240 5% 11%;
+
+    --muted: 40 20% 90%;
+    --muted-foreground: 240 4% 46%;
+
+    --accent: 40 30% 92%;
+    --accent-foreground: 240 5% 11%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 38 30% 88%;
+    /* #E8E2D8 */
+    --input: 38 30% 88%;
+    --ring: 14 61% 47%;
+
+    --radius: 0.75rem;
+    /* 12px for rounded-xl look */
+
+    /* Custom Brand Colors - Mapped to potential future themes */
+    --brand: 14 61% 47%;
+    --brand-light: 13 69% 63%;
+    /* #E07A5F */
+    --brand-dark: 13 65% 38%;
+    /* #A13D22 */
+    --success: 152 41% 52%;
+    /* #52B788 */
+    --warning: 25 95% 53%;
+    /* #F97316 */
+  }
+
+  .dark {
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 10% 4%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 4%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 14 61% 47%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 14 61% 47%;
+  }
+}
+
+@layer base {
   * {
     @apply border-border;
   }
-  
+
   body {
-    @apply bg-background text-charcoal antialiased;
+    @apply bg-background;
+    color: hsl(var(--foreground));
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
-  
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-display tracking-tight font-semibold text-charcoal;
+
+  /* Typography */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display tracking-tight text-foreground;
   }
-  
-  h1 { @apply text-4xl lg:text-5xl; }
-  h2 { @apply text-3xl lg:text-4xl; }
-  h3 { @apply text-2xl lg:text-3xl; }
-  h4 { @apply text-xl lg:text-2xl; }
-  h5 { @apply text-lg lg:text-xl; }
-  h6 { @apply text-base lg:text-lg; }
+
+  h1 {
+    @apply text-4xl lg:text-5xl font-bold leading-tight mb-6;
+    /* approx 3rem / 48px */
+  }
+
+  h2 {
+    @apply text-3xl lg:text-4xl font-semibold leading-tight mb-4;
+    /* approx 2.25rem / 36px */
+  }
+
+  h3 {
+    @apply text-2xl lg:text-3xl font-semibold leading-snug mb-3;
+    /* approx 1.875rem / 30px */
+  }
+
+  h4 {
+    @apply text-xl lg:text-2xl font-medium leading-snug mb-2;
+    /* approx 1.5rem / 24px */
+  }
+
+  h5 {
+    @apply text-lg lg:text-xl font-medium leading-normal mb-2;
+    /* approx 1.25rem / 20px */
+  }
+
+  h6 {
+    @apply text-base font-medium leading-normal mb-1;
+  }
+
+  p {
+    @apply mb-4 leading-7 text-muted-foreground;
+  }
+
+
+  /* Typography end */
 }
 
 @layer components {
-  /* Buttons */
+  /* Utility classes mapped to semantic tokens */
+
+  /* Keep legacy btn- classes for backward compatibility but map them to new utilities */
   .btn-primary {
-    @apply h-10 px-6 rounded-lg bg-brand text-white font-medium 
-           hover:bg-brand-dark active:scale-[0.98]
-           transition-all duration-150 shadow-warm
-           focus:outline-none focus:ring-2 focus:ring-brand/20 focus:ring-offset-2;
+    @apply h-10 px-6 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/90 active:scale-[0.98] transition-all duration-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1;
   }
-  
+
   .btn-secondary {
-    @apply h-10 px-6 rounded-lg border border-border bg-surface text-charcoal font-medium
-           hover:bg-background active:scale-[0.98]
-           transition-all duration-150
-           focus:outline-none focus:ring-2 focus:ring-brand/20 focus:ring-offset-2;
+    @apply h-10 px-6 rounded-lg border border-input bg-background/50 text-foreground font-medium hover:bg-accent hover:text-accent-foreground active:scale-[0.98] transition-all duration-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1;
   }
-  
-  .btn-success {
-    @apply h-10 px-6 rounded-lg bg-success text-white font-medium 
-           hover:bg-success-dark active:scale-[0.98]
-           transition-all duration-150
-           focus:outline-none focus:ring-2 focus:ring-success/20 focus:ring-offset-2;
-  }
-  
+
   .btn-ghost {
-    @apply h-10 px-4 rounded-lg text-charcoal font-medium
-           hover:bg-background active:scale-[0.98]
-           transition-all duration-150;
+    @apply h-10 px-4 rounded-lg text-foreground font-medium hover:bg-muted active:scale-[0.98] transition-all duration-200;
   }
-  
-  /* Cards */
+
   .card {
-    @apply rounded-xl border border-border bg-surface p-6 shadow-card
-           transition-all duration-200;
+    @apply rounded-xl border border-border bg-card text-card-foreground shadow-sm transition-all duration-200;
   }
-  
+
   .card-hover {
-    @apply card hover:shadow-card-hover hover:-translate-y-0.5 cursor-pointer;
-  }
-  
-  /* Form Elements */
-  .input {
-    @apply h-10 w-full rounded-lg border border-border bg-surface px-4 text-charcoal
-           placeholder:text-charcoal-light/40
-           focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand
-           transition-all duration-150;
-  }
-  
-  .textarea {
-    @apply w-full rounded-lg border border-border bg-surface px-4 py-3 text-charcoal
-           placeholder:text-charcoal-light/40 resize-none
-           focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand
-           transition-all duration-150;
-  }
-  
-  .select {
-    @apply h-10 w-full rounded-lg border border-border bg-surface px-4 text-charcoal
-           focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand
-           transition-all duration-150;
-  }
-  
-  /* Badges */
-  .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium;
-  }
-  
-  .badge-brand {
-    @apply badge bg-brand/10 text-brand-text;
-  }
-  
-  .badge-success {
-    @apply badge bg-success/10 text-success-dark;
-  }
-  
-  .badge-warning {
-    @apply badge bg-warning/10 text-warning;
-  }
-  
-  .badge-neutral {
-    @apply badge bg-charcoal/5 text-charcoal-light;
+    @apply card hover:shadow-md hover:-translate-y-0.5 cursor-pointer;
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
-  }
-  
-  .animate-fade-in {
-    animation: fadeIn 0.4s ease-in-out;
-  }
-  
-  .animate-slide-up {
-    animation: slideUp 0.3s ease-out;
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
   }
 }
