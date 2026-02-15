@@ -1,10 +1,28 @@
 import { Redis } from 'ioredis';
 
-// Reuse the existing Redis URL from environment variables
-const REDIS_URL = process.env.REDIS_URL;
+// Helper to construct Redis URL from Upstash REST Env Vars if needed
+function getRedisUrl(): string | undefined {
+    if (process.env.REDIS_URL) {
+        return process.env.REDIS_URL;
+    }
 
-if (!REDIS_URL) {
-    throw new Error('REDIS_URL is not defined in environment variables');
+    // Fallback: Construct TCP URL from Upstash REST variables
+    // Pattern: rediss://default:<TOKEN>@<HOST>:6379
+    if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+        try {
+            const dbUrl = new URL(process.env.UPSTASH_REDIS_REST_URL);
+            const host = dbUrl.hostname;
+            const port = 6379; // Standard Upstash port
+            const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+            console.log('🔌 Auto-configuring Redis from Upstash REST credentials...');
+            return `rediss://default:${token}@${host}:${port}`;
+        } catch (e) {
+            console.warn('⚠️ Failed to parse UPSTASH_REDIS_REST_URL for Redis connection fallback', e);
+        }
+    }
+
+    return undefined;
 }
 
 // Create a singleton Redis connection for queues (ioredis)
@@ -13,10 +31,19 @@ let _redisConnection: Redis | null = null;
 
 export function getRedisConnection(): Redis {
     if (!_redisConnection) {
-        _redisConnection = new Redis(REDIS_URL as string, {
+        const redisUrl = getRedisUrl();
+
+        if (!redisUrl) {
+            throw new Error(
+                'Redis Connection Failed: Missing REDIS_URL and could not derive from UPSTASH_REDIS_REST_URL. Please set REDIS_URL environment variable.'
+            );
+        }
+
+        _redisConnection = new Redis(redisUrl, {
             maxRetriesPerRequest: null, // Required by BullMQ
             enableReadyCheck: false,    // Faster startup
-            tls: REDIS_URL!.startsWith('rediss://') ? {} : undefined, // Check specifically for rediss protocol
+            // Check specifically for rediss protocol for TLS
+            tls: redisUrl.startsWith('rediss://') ? {} : undefined,
         });
 
         _redisConnection.on('error', (err) => {
@@ -32,9 +59,15 @@ export function getRedisConnection(): Redis {
 
 // Separate connection for subscribers (BullMQ needs separate connections)
 export function createRedisConnection(): Redis {
-    return new Redis(REDIS_URL!, {
+    const redisUrl = getRedisUrl();
+
+    if (!redisUrl) {
+        throw new Error('Redis Configuration Missing during subscriber creation');
+    }
+
+    return new Redis(redisUrl, {
         maxRetriesPerRequest: null,
         enableReadyCheck: false,
-        tls: REDIS_URL?.startsWith('rediss://') ? {} : undefined,
+        tls: redisUrl.startsWith('rediss://') ? {} : undefined,
     });
 }

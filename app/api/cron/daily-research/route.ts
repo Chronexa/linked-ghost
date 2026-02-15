@@ -4,6 +4,8 @@ import { users } from '@/lib/db/schema';
 import { enqueueResearch } from '@/lib/queue';
 import { eq, gte, and } from 'drizzle-orm';
 
+export const dynamic = 'force-dynamic';
+
 // Secret token verification for Cron Jobs
 function verifyCron(req: NextRequest) {
     const authHeader = req.headers.get('authorization');
