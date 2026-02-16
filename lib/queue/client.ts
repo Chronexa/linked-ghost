@@ -16,7 +16,9 @@ function getRedisUrl(): string | undefined {
             const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
             console.log('🔌 Auto-configuring Redis from Upstash REST credentials...');
-            return `rediss://default:${token}@${host}:${port}`;
+            const redisUrl = `rediss://default:${token}@${host}:${port}`;
+            console.log(`   Constructed URL: rediss://default:***@${host}:${port}`);
+            return redisUrl;
         } catch (e) {
             console.warn('⚠️ Failed to parse UPSTASH_REDIS_REST_URL for Redis connection fallback', e);
         }
