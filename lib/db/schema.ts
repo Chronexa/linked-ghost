@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, timestamp, boolean, integer, jsonb, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, timestamp, boolean, integer, jsonb, pgEnum, unique } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // ============================================================================
@@ -175,7 +175,8 @@ export const classifiedTopics = pgTable('classified_topics', {
 export const generatedDrafts = pgTable('generated_drafts', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
-  topicId: uuid('topic_id').notNull().references(() => classifiedTopics.id, { onDelete: 'cascade' }),
+  conversationId: uuid('conversation_id').references(() => conversations.id, { onDelete: 'set null' }), // Link back to chat
+  topicId: uuid('topic_id').references(() => classifiedTopics.id, { onDelete: 'set null' }),
   pillarId: uuid('pillar_id').notNull().references(() => pillars.id, { onDelete: 'cascade' }),
   userPerspective: text('user_perspective').notNull(), // User's take on the topic that generated this draft
   variantLetter: varchar('variant_letter', { length: 1 }).notNull(), // A, B, or C
@@ -194,6 +195,7 @@ export const generatedDrafts = pgTable('generated_drafts', {
   scheduledFor: timestamp('scheduled_for'),
   postedAt: timestamp('posted_at'),
   linkedinPostId: varchar('linkedin_post_id', { length: 255 }), // LinkedIn API post ID
+  metadata: jsonb('metadata'), // Store additional context (angle, source, etc.)
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -226,7 +228,9 @@ export const usageTracking = pgTable('usage_tracking', {
   voiceAnalyses: integer('voice_analyses').notNull().default(0),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+}, (t) => ({
+  unq: unique().on(t.userId, t.month),
+}));
 
 // Conversations (chat sessions)
 export const conversations = pgTable('conversations', {

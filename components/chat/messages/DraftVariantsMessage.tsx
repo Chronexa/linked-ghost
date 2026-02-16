@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Copy, RefreshCw, Check, Edit2, Bot } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { toast } from 'react-hot-toast';
@@ -32,13 +31,13 @@ interface DraftVariantsMessageProps {
 }
 
 export function DraftVariantsMessage({ drafts, onRegenerate, onSelect, onSave, isRegenerating, topicId }: DraftVariantsMessageProps) {
-    const [activeTab, setActiveTab] = useState(drafts[0]?.variantLetter || 'A');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editedText, setEditedText] = useState('');
     const [savedOverrides, setSavedOverrides] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
 
-    const currentDraft = drafts.find(d => d.variantLetter === activeTab) || drafts[0];
+    // Always use the first draft (Single Draft Mode)
+    const currentDraft = drafts[0];
 
     if (!currentDraft) {
         return null;
@@ -87,149 +86,57 @@ export function DraftVariantsMessage({ drafts, onRegenerate, onSelect, onSave, i
     return (
         <div className="flex w-full justify-start mb-8">
             <div className="flex w-full max-w-[95%] items-start gap-4">
-                <Avatar className="h-10 w-10 mt-1 border border-border shadow-sm">
-                    <AvatarImage src="/ai-avatar.png" alt="AI" />
-                    <AvatarFallback className="bg-primary/10 text-primary">
-                        <Bot className="h-5 w-5" />
-                    </AvatarFallback>
-                </Avatar>
-
                 <div className="flex flex-col w-full gap-5">
-                    {drafts.length === 1 ? (
-                        <Card className="border-border/60 shadow-sm overflow-hidden">
-                            <CardHeader className="pb-3 bg-muted/30 border-b border-border/50 flex flex-row items-center justify-between space-y-0 px-5 pt-4">
-                                <div className="space-y-1">
-                                    <div className="flex gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                                        <span className="text-primary">{currentDraft.style || 'Standard'} Style</span>
-                                    </div>
-                                </div>
-                                <div className="text-xs text-muted-foreground font-mono">
-                                    {getDisplayText(currentDraft).length} chars
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                {editingId === currentDraft.id ? (
-                                    <div className="p-4 space-y-3 bg-background">
-                                        <Textarea
-                                            value={editedText}
-                                            onChange={(e) => setEditedText(e.target.value)}
-                                            className="min-h-[300px] text-sm leading-relaxed resize-y border-border focus-visible:ring-1 focus-visible:ring-primary/20 font-normal"
-                                            spellCheck={false}
-                                        />
-                                        <div className="flex justify-end gap-2">
-                                            <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="h-8 text-xs" disabled={saving}>Cancel</Button>
-                                            <Button size="sm" onClick={() => handleEditSave()} className="h-8 text-xs" disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</Button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div
-                                        className="whitespace-pre-wrap text-sm leading-relaxed cursor-text p-6 hover:bg-muted/10 transition-colors font-normal text-foreground/90 selection:bg-primary/10"
-                                        onClick={() => handleEditStart(currentDraft)}
-                                        title="Click to edit text"
-                                    >
-                                        {getDisplayText(currentDraft)}
-                                    </div>
-                                )}
-
-                                <div className="flex items-center justify-between p-3 px-5 bg-muted/20 border-t border-border/50">
-                                    <div className="flex gap-2">
-                                        <Button size="sm" variant="secondary" onClick={() => handleCopy(getDisplayText(currentDraft))} className="h-8 text-xs bg-background hover:bg-accent border shadow-sm">
-                                            <Copy className="w-3.5 h-3.5 mr-1.5" /> Copy
-                                        </Button>
-                                        <Button size="sm" variant="ghost" onClick={() => handleEditStart(currentDraft)} className="h-8 text-xs hover:bg-accent">
-                                            <Edit2 className="w-3.5 h-3.5 mr-1.5" /> Edit
-                                        </Button>
-                                    </div>
-                                    <Button size="sm" onClick={() => onSelect?.(currentDraft)} className="h-8 text-xs bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm">
-                                        Select This <Check className="w-3.5 h-3.5 ml-1.5" />
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="w-full">
-                            <div className="flex items-center justify-between mb-3">
-                                <TabsList className="bg-secondary/50 p-1 h-9">
-                                    {drafts.map(draft => (
-                                        <TabsTrigger
-                                            key={draft.id}
-                                            value={draft.variantLetter}
-                                            className="text-xs px-3 py-1 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-                                        >
-                                            Variant {draft.variantLetter}
-                                        </TabsTrigger>
-                                    ))}
-                                </TabsList>
-                                <div className="flex items-center gap-2">
-                                    {currentDraft.voiceMatchScore != null && (
-                                        <Badge variant="success" className="text-[10px] font-medium text-green-700 border-green-200 bg-green-50 px-2 py-0.5">
-                                            {currentDraft.voiceMatchScore}% Voice Match
-                                        </Badge>
-                                    )}
-                                    {currentDraft.qualityWarnings?.length ? (
-                                        <Badge variant="warning" className="text-[10px] font-medium px-2 py-0.5" title={currentDraft.qualityWarnings.join(' • ')}>
-                                            Needs editing
-                                        </Badge>
-                                    ) : null}
+                    <Card className="border-border/60 shadow-sm overflow-hidden">
+                        <CardHeader className="pb-3 bg-muted/30 border-b border-border/50 flex flex-row items-center justify-between space-y-0 px-5 pt-4">
+                            <div className="space-y-1">
+                                <div className="flex gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                    <span className="text-primary">{currentDraft.style || 'Standard'} Style</span>
                                 </div>
                             </div>
+                            <div className="text-xs text-muted-foreground font-mono">
+                                {getDisplayText(currentDraft).length} chars
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            {editingId === currentDraft.id ? (
+                                <div className="p-4 space-y-3 bg-background">
+                                    <Textarea
+                                        value={editedText}
+                                        onChange={(e) => setEditedText(e.target.value)}
+                                        className="min-h-[300px] text-sm leading-relaxed resize-y border-border focus-visible:ring-1 focus-visible:ring-primary/20 font-normal"
+                                        spellCheck={false}
+                                    />
+                                    <div className="flex justify-end gap-2">
+                                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="h-8 text-xs" disabled={saving}>Cancel</Button>
+                                        <Button size="sm" onClick={() => handleEditSave()} className="h-8 text-xs" disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div
+                                    className="whitespace-pre-wrap text-sm leading-relaxed cursor-text p-6 hover:bg-muted/10 transition-colors font-normal text-foreground/90 selection:bg-primary/10"
+                                    onClick={() => handleEditStart(currentDraft)}
+                                    title="Click to edit text"
+                                >
+                                    {getDisplayText(currentDraft)}
+                                </div>
+                            )}
 
-                            {drafts.map(draft => (
-                                <TabsContent key={draft.id} value={draft.variantLetter} className="mt-0 focus-visible:ring-0">
-                                    <Card className="border-border/60 shadow-sm overflow-hidden">
-                                        <CardHeader className="pb-3 bg-muted/30 border-b border-border/50 flex flex-row items-center justify-between space-y-0 px-5 pt-4">
-                                            <div className="space-y-1">
-                                                <div className="flex gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                                                    <span className="text-primary">{draft.style || 'Standard'} Style</span>
-                                                </div>
-                                            </div>
-                                            <div className="text-xs text-muted-foreground font-mono">
-                                                {getDisplayText(draft).length} chars
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent className="p-0">
-                                            {editingId === draft.id ? (
-                                                <div className="p-4 space-y-3 bg-background">
-                                                    <Textarea
-                                                        value={editedText}
-                                                        onChange={(e) => setEditedText(e.target.value)}
-                                                        className="min-h-[300px] text-sm leading-relaxed resize-y border-border focus-visible:ring-1 focus-visible:ring-primary/20 font-normal"
-                                                        spellCheck={false}
-                                                    />
-                                                    <div className="flex justify-end gap-2">
-                                                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="h-8 text-xs" disabled={saving}>Cancel</Button>
-                                                        <Button size="sm" onClick={() => handleEditSave()} className="h-8 text-xs" disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</Button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div
-                                                    className="whitespace-pre-wrap text-sm leading-relaxed cursor-text p-6 hover:bg-muted/10 transition-colors font-normal text-foreground/90 selection:bg-primary/10"
-                                                    onClick={() => handleEditStart(draft)}
-                                                    title="Click to edit text"
-                                                >
-                                                    {getDisplayText(draft)}
-                                                </div>
-                                            )}
-
-                                            <div className="flex items-center justify-between p-3 px-5 bg-muted/20 border-t border-border/50">
-                                                <div className="flex gap-2">
-                                                    <Button size="sm" variant="secondary" onClick={() => handleCopy(getDisplayText(draft))} className="h-8 text-xs bg-background hover:bg-accent border shadow-sm">
-                                                        <Copy className="w-3.5 h-3.5 mr-1.5" /> Copy
-                                                    </Button>
-                                                    <Button size="sm" variant="ghost" onClick={() => handleEditStart(draft)} className="h-8 text-xs hover:bg-accent">
-                                                        <Edit2 className="w-3.5 h-3.5 mr-1.5" /> Edit
-                                                    </Button>
-                                                </div>
-                                                <Button size="sm" onClick={() => onSelect?.(draft)} className="h-8 text-xs bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm">
-                                                    Select This <Check className="w-3.5 h-3.5 ml-1.5" />
-                                                </Button>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </TabsContent>
-                            ))}
-                        </Tabs>
-                    )}
+                            <div className="flex items-center justify-between p-3 px-5 bg-muted/20 border-t border-border/50">
+                                <div className="flex gap-2">
+                                    <Button size="sm" variant="secondary" onClick={() => handleCopy(getDisplayText(currentDraft))} className="h-8 text-xs bg-background hover:bg-accent border shadow-sm">
+                                        <Copy className="w-3.5 h-3.5 mr-1.5" /> Copy
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleEditStart(currentDraft)} className="h-8 text-xs hover:bg-accent">
+                                        <Edit2 className="w-3.5 h-3.5 mr-1.5" /> Edit
+                                    </Button>
+                                </div>
+                                <Button size="sm" onClick={() => onSelect?.(currentDraft)} className="h-8 text-xs bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm">
+                                    Open Editor <Edit2 className="w-3.5 h-3.5 ml-1.5" />
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
 
                     <div className="flex justify-center">
                         <Button variant="ghost" size="sm" className="text-muted-foreground text-xs hover:text-foreground transition-colors" onClick={onRegenerate} disabled={isRegenerating || !topicId}>

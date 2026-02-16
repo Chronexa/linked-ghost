@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Bot, Sparkles, SkipForward } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
 interface PerspectiveRequestMessageProps {
@@ -24,13 +23,6 @@ export function PerspectiveRequestMessage({ onSubmit, onSkip, isLoading }: Persp
     return (
         <div className="flex w-full justify-start mb-6">
             <div className="flex w-full max-w-[90%] items-start gap-3">
-                <Avatar className="h-8 w-8 mt-1 border border-border">
-                    <AvatarImage src="/ai-avatar.png" alt="AI" />
-                    <AvatarFallback className="bg-secondary text-secondary-foreground">
-                        <Bot className="h-4 w-4" />
-                    </AvatarFallback>
-                </Avatar>
-
                 <div className="flex flex-col w-full gap-3">
                     <div className="bg-secondary/40 border border-border/50 rounded-2xl rounded-tl-sm px-5 py-4 text-sm shadow-sm">
                         That&apos;s a great topic. What&apos;s your unique perspective or take on this? Or you can skip to let me suggest an angle.

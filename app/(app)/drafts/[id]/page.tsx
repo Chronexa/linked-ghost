@@ -20,73 +20,72 @@ export default function DraftEditorPage() {
   const currentDraft = payload?.draft;
   const topic = payload?.topic;
   const pillarName = payload?.pillarName;
-
-  const { data: siblingsData } = useDrafts(
-    currentDraft?.topicId ? { topicId: currentDraft.topicId, limit: 10 } : undefined,
-    { enabled: !!currentDraft?.topicId }
-  );
-  const siblings = useMemo(() => (siblingsData as any)?.data ?? [], [siblingsData]);
-  const variants = ['A', 'B', 'C'].map((letter) =>
-    siblings.find((d: any) => (d.variantLetter || '').toUpperCase() === letter)
-  ).filter(Boolean);
-
-  const hasThreeVariants = variants.length >= 2;
+  // Use conversationId from draft data if available, or fall back to dashboard
+  const conversationId = currentDraft?.conversationId;
 
   const updateDraft = useUpdateDraft();
   const approveDraft = useApproveDraft();
   const scheduleDraft = useScheduleDraft();
 
-  const [editedByVariant, setEditedByVariant] = useState<Record<string, string>>({});
-  const [notesByVariant, setNotesByVariant] = useState<Record<string, string>>({});
+  const [editedText, setEditedText] = useState('');
+  const [feedbackNotes, setFeedbackNotes] = useState('');
   const [scheduledFor, setScheduledFor] = useState('');
-  const [showSchedulerFor, setShowSchedulerFor] = useState<string | null>(null);
+  const [showScheduler, setShowScheduler] = useState(false);
 
   useEffect(() => {
     if (!currentDraft) return;
-    const text = currentDraft.editedText || currentDraft.fullText || '';
-    const notes = currentDraft.feedbackNotes || '';
-    setEditedByVariant((prev) => ({ ...prev, [currentDraft.id]: text }));
-    setNotesByVariant((prev) => ({ ...prev, [currentDraft.id]: notes }));
+    setEditedText(currentDraft.editedText || currentDraft.fullText || '');
+    setFeedbackNotes(currentDraft.feedbackNotes || '');
   }, [currentDraft]);
 
-  useEffect(() => {
-    siblings.forEach((d: any) => {
-      if (!d) return;
-      const text = d.editedText || d.fullText || '';
-      const notes = d.feedbackNotes || '';
-      setEditedByVariant((prev) => ({ ...prev, [d.id]: prev[d.id] ?? text }));
-      setNotesByVariant((prev) => ({ ...prev, [d.id]: prev[d.id] ?? notes }));
-    });
-  }, [siblings]);
-
-  const handleSave = async (id: string) => {
-    const text = editedByVariant[id];
-    if (text == null) return;
+  const handleSave = async () => {
+    if (!currentDraft) return;
     await updateDraft.mutateAsync({
-      id,
-      data: { fullText: text, feedbackNotes: notesByVariant[id] || undefined },
+      id: currentDraft.id,
+      data: { fullText: editedText, feedbackNotes: feedbackNotes || undefined },
     });
     toast.success('Saved changes');
   };
 
-  const handleApprove = async (id: string) => {
-    await approveDraft.mutateAsync(id);
+  const handleApprove = async () => {
+    if (!currentDraft) return;
+    await approveDraft.mutateAsync(currentDraft.id);
     toast.success('Draft approved');
-    router.push('/drafts');
+    // If we have a conversation ID, go back there. Otherwise drafts list.
+    if (conversationId) {
+      router.push(`/dashboard?conversationId=${conversationId}`);
+    } else {
+      router.push('/drafts');
+    }
   };
 
-  const handleReject = async (id: string) => {
-    await updateDraft.mutateAsync({ id, data: { status: 'rejected' } });
+  const handleReject = async () => {
+    if (!currentDraft) return;
+    await updateDraft.mutateAsync({ id: currentDraft.id, data: { status: 'rejected' } });
     toast.success('Draft rejected');
-    router.push('/drafts');
+    // If we have a conversation ID, go back there. Otherwise drafts list.
+    if (conversationId) {
+      router.push(`/dashboard?conversationId=${conversationId}`);
+    } else {
+      router.push('/drafts');
+    }
   };
 
-  const handleSchedule = async (id: string) => {
-    if (!scheduledFor) return;
-    await scheduleDraft.mutateAsync({ id, scheduledFor });
-    setShowSchedulerFor(null);
+  const handleSchedule = async () => {
+    if (!currentDraft || !scheduledFor) return;
+    await scheduleDraft.mutateAsync({ id: currentDraft.id, scheduledFor });
+    setShowScheduler(false);
     toast.success('Scheduled successfully');
   };
+
+  const handleBack = () => {
+    // If we have a conversation ID, go back there. Otherwise drafts list.
+    if (conversationId) {
+      router.push(`/dashboard?conversationId=${conversationId}`);
+    } else {
+      router.back();
+    }
+  }
 
   if (isLoading || !currentDraft) {
     return (
@@ -100,18 +99,19 @@ export default function DraftEditorPage() {
   const contextPillar = pillarName;
 
   return (
-    <div className="space-y-6">
-      <Link
-        href="/drafts"
-        className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring rounded"
+    <div className="space-y-6 max-w-4xl mx-auto">
+      <Button
+        variant="ghost"
+        onClick={handleBack}
+        className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors p-0 hover:bg-transparent"
       >
         <ChevronLeft className="w-4 h-4 mr-2" />
-        Back to Generated
-      </Link>
+        Back to Conversation
+      </Button>
 
       {/* Context card: source topic + pillar */}
       {(contextTopic || contextPillar) && (
-        <Card className="bg-card border-border">
+        <Card className="bg-card border-border shadow-sm">
           <CardContent className="py-4">
             <div className="flex flex-wrap items-start gap-4">
               {contextPillar && (
@@ -138,68 +138,18 @@ export default function DraftEditorPage() {
         </Card>
       )}
 
-      {/* Draft Variants */}
-      {hasThreeVariants ? (
-        <>
-          {/* Mobile: Tabs */}
-          <div className="md:hidden">
-            <Tabs defaultValue={variants[0]?.variantLetter || 'A'} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 mb-4">
-                {variants.map((variant: any) => (
-                  <TabsTrigger key={variant.id} value={variant.variantLetter}>
-                    Variant {variant.variantLetter}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-              {variants.map((variant: any) => (
-                <TabsContent key={variant.id} value={variant.variantLetter}>
-                  <DraftVariantCard
-                    draft={variant}
-                    text={editedByVariant[variant.id] ?? ''}
-                    setText={(val) => setEditedByVariant((prev) => ({ ...prev, [variant.id]: val }))}
-                    onSave={() => handleSave(variant.id)}
-                    onApprove={() => handleApprove(variant.id)}
-                    onReject={() => handleReject(variant.id)}
-                    onSchedule={(date) => { setScheduledFor(date); handleSchedule(variant.id); }}
-                    isPending={updateDraft.isPending || approveDraft.isPending}
-                  />
-                </TabsContent>
-              ))}
-            </Tabs>
-          </div>
-
-          {/* Desktop: Grid */}
-          <div className="hidden md:grid md:grid-cols-3 gap-6">
-            {variants.map((variant: any) => (
-              <DraftVariantCard
-                key={variant.id}
-                draft={variant}
-                text={editedByVariant[variant.id] ?? ''}
-                setText={(val) => setEditedByVariant((prev) => ({ ...prev, [variant.id]: val }))}
-                onSave={() => handleSave(variant.id)}
-                onApprove={() => handleApprove(variant.id)}
-                onReject={() => handleReject(variant.id)}
-                onSchedule={(date) => { setScheduledFor(date); handleSchedule(variant.id); }}
-                isPending={updateDraft.isPending || approveDraft.isPending}
-              />
-            ))}
-          </div>
-        </>
-      ) : (
-        <div className="max-w-2xl mx-auto">
-          <DraftVariantCard
-            draft={currentDraft}
-            text={editedByVariant[currentDraft.id] ?? ''}
-            setText={(val) => setEditedByVariant((prev) => ({ ...prev, [currentDraft.id]: val }))}
-            onSave={() => handleSave(currentDraft.id)}
-            onApprove={() => handleApprove(currentDraft.id)}
-            onReject={() => handleReject(currentDraft.id)}
-            onSchedule={(date) => { setScheduledFor(date); handleSchedule(currentDraft.id); }}
-            isPending={updateDraft.isPending || approveDraft.isPending}
-            singleMode
-          />
-        </div>
-      )}
+      {/* Single Draft Editor */}
+      <DraftVariantCard
+        draft={currentDraft}
+        text={editedText}
+        setText={setEditedText}
+        onSave={handleSave}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        onSchedule={(date) => { setScheduledFor(date); handleSchedule(); }}
+        isPending={updateDraft.isPending || approveDraft.isPending}
+        singleMode
+      />
     </div>
   );
 }

@@ -46,7 +46,7 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask anything or st
         <div className="relative w-full max-w-3xl mx-auto">
             <div
                 className={cn(
-                    "relative flex flex-col bg-card border border-border/60 shadow-lg rounded-2xl transition-all duration-200 overflow-hidden",
+                    "relative flex flex-col bg-card border border-border/60 shadow-sm rounded-2xl transition-all duration-200 overflow-hidden",
                     "focus-within:ring-2 focus-within:ring-brand/20 focus-within:border-brand/50",
                     isLoading && "opacity-80 pointer-events-none"
                 )}
@@ -57,7 +57,7 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask anything or st
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder}
-                    className="min-h-[60px] max-h-[200px] w-full resize-none border-0 bg-transparent py-4 px-4 shadow-none focus-visible:ring-0 text-base placeholder:text-muted-foreground/60 leading-relaxed scrollbar-hide"
+                    className="min-h-[44px] max-h-[200px] w-full resize-none border-0 bg-transparent py-4 px-4 shadow-none focus-visible:ring-0 text-base placeholder:text-muted-foreground/60 leading-relaxed scrollbar-hide"
                     rows={1}
                 />
 
@@ -108,8 +108,8 @@ export function ChatInput({ onSend, isLoading, placeholder = "Ask anything or st
                 </div>
             </div>
 
-            <div className="text-center mt-3">
-                <p className="text-[11px] text-muted-foreground/50">
+            <div className="text-center mt-2">
+                <p className="text-[10px] text-muted-foreground/50">
                     AI can make mistakes. Verify important information.
                 </p>
             </div>

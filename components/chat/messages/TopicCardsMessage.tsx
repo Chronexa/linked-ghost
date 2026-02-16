@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { ChevronRight, Newspaper, TrendingUp, ChevronDown, ChevronUp, RefreshCw, Lightbulb, Sparkles } from 'lucide-react'; // Added icons
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Bot } from 'lucide-react';
 
 interface PerplexitySource {
@@ -58,13 +57,6 @@ export function TopicCardsMessage({ topics, onSelect, onRegenerate }: TopicCards
   return (
     <div className="flex w-full justify-start mb-8 animate-in fade-in duration-500">
       <div className="flex w-full items-start gap-4">
-        <Avatar className="h-8 w-8 mt-1 border border-border shadow-sm shrink-0">
-          <AvatarImage src="/ai-avatar.png" alt="AI" />
-          <AvatarFallback className="bg-primary/5 text-primary">
-            <Bot className="h-4 w-4" />
-          </AvatarFallback>
-        </Avatar>
-
         <div className="flex flex-col w-full gap-4 min-w-0 max-w-[calc(100%-48px)]">
           <div className="bg-transparent px-1 py-0 text-sm text-foreground/80 leading-relaxed">
             I found <span className="font-semibold text-foreground">{topics.length} trending topics</span> for you. Select one to start drafting, or add your customized angle.

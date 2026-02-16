@@ -153,6 +153,7 @@ export async function generateDraftVariants(params: {
   numVariants?: number;
   userInstructions?: string;
   userId: string; // Added userId to fetch profile
+  styles?: string[]; // Optional specific styles for variants (e.g. ['Professional', 'Conversational', 'Bold'])
 }): Promise<GenerationResult> {
   const startTime = Date.now();
 
@@ -167,9 +168,10 @@ export async function generateDraftVariants(params: {
     customPrompt,
     voiceExamples,
     masterVoiceEmbedding,
-    numVariants = 1,
+    numVariants = 1, // Default to single draft
     userInstructions,
     userId,
+    styles,
   } = params;
 
   // 1. Fetch Profile Data (Mission Objective 1.3)
@@ -342,8 +344,9 @@ export function buildSystemPrompt(params: {
   customPrompt?: string;
   numVariants?: number;
   authorContext?: string;
+  styles?: string[];
 }): string {
-  const { pillarName, pillarDescription, pillarTone, targetAudience, customPrompt, numVariants = 1, authorContext = '' } = params;
+  const { pillarName, pillarDescription, pillarTone, targetAudience, customPrompt, numVariants = 1, authorContext = '', styles } = params;
 
   // Build pillar context string
   const contextParts = [];
@@ -360,8 +363,18 @@ export function buildSystemPrompt(params: {
     authorContext,
   });
 
+
+
   // Update to request specific number of variants
-  return systemPromptText.replace('3 variants', `${numVariants} variants`);
+  let refinedPrompt = systemPromptText.replace('3 variants', `${numVariants} variants`);
+
+  // Inject specific style requirements if provided
+  if (styles && styles.length > 0) {
+    const styleInstructions = styles.map((style, i) => `Variant ${String.fromCharCode(65 + i)}: ${style} tone`).join('\n');
+    refinedPrompt += `\n\n**VARIANT REQUIREMENTS:**\nGenerate ${numVariants} variants with the following distinct styles:\n${styleInstructions}\n\nEnsure each variant is distinct in tone and structure.`;
+  }
+
+  return refinedPrompt;
 }
 
 /**

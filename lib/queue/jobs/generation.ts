@@ -55,6 +55,7 @@ export async function generationJob(job: Job<GenerationJobData>) {
         // Store drafts in DB
         const draftInserts = result.variants.map((variant) => ({
             userId,
+            conversationId, // Link back to chat
             topicId,
             pillarId,
             userPerspective: userPerspective || 'Write an engaging LinkedIn post about this topic.',

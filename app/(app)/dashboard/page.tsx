@@ -8,6 +8,7 @@ import { useConversations } from '@/lib/hooks/use-conversations';
 import { useChat } from '@/lib/hooks/use-chat';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { QuickPostModal } from '@/components/quick-post/QuickPostModal';
 
 export default function Dashboard() {
   const searchParams = useSearchParams();
@@ -37,6 +38,9 @@ export default function Dashboard() {
     }
   };
 
+
+  const [isQuickPostOpen, setIsQuickPostOpen] = React.useState(false);
+
   if (conversationId) {
     return (
       <div className="h-full">
@@ -46,10 +50,16 @@ export default function Dashboard() {
   }
 
   return (
-    <EmptyStateDashboard
-      onResearchIdeas={() => handleCreateConversation('research')}
-      onWriteFromScratch={() => handleCreateConversation('write-scratch')}
-      onQuickPrompt={(prompt) => handleCreateConversation(undefined, prompt)}
-    />
+    <>
+      <EmptyStateDashboard
+        onResearchIdeas={() => handleCreateConversation('research')}
+        onQuickPrompt={(prompt) => handleCreateConversation(undefined, prompt)}
+        onQuickPost={() => setIsQuickPostOpen(true)}
+      />
+      <QuickPostModal
+        isOpen={isQuickPostOpen}
+        onClose={() => setIsQuickPostOpen(false)}
+      />
+    </>
   );
 }

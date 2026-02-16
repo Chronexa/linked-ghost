@@ -97,7 +97,8 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
             () => generateDraftVariants({
                 topicTitle: topicTitle,
                 topicDescription: "User's raw thoughts: " + rawThoughts,
-                userPerspective: rawThoughts, // The thoughts ARE the perspective
+                topicDescription: "User's raw thoughts: " + rawThoughts,
+                userPerspective: "CORE CONTENT / RAW THOUGHTS:\n" + rawThoughts + "\n\nINSTRUCTION: Expand these thoughts into a full post.", // Explicit instruction
                 pillarName: pillar.name,
                 pillarDescription: pillar.description || undefined,
                 pillarTone: pillar.tone || undefined,
@@ -108,7 +109,7 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
                     embedding: ex.embedding as number[] | undefined,
                 })),
                 masterVoiceEmbedding: (profile?.voiceEmbedding as number[]) || undefined,
-                numVariants: 2,
+                numVariants: 1, // Default to single draft
                 userId: user.id,
             }),
             { maxAttempts: 3, delayMs: 1000, exponentialBackoff: true, retryOn: isRetryableError }
@@ -117,6 +118,7 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
         // Save Drafts
         const draftsToInsert = genResult.variants.map((variant: any) => ({
             userId: user.id,
+            conversationId, // Link back to conversation
             topicId: newTopic.id,
             pillarId: effectivePillarId!,
             userPerspective: rawThoughts,

@@ -1,15 +1,15 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, PenTool, Lightbulb } from 'lucide-react';
+import { Search, PenTool, Lightbulb, Zap } from 'lucide-react';
 import { ChatInput } from './ChatInput';
 
 interface EmptyStateDashboardProps {
     onResearchIdeas: () => void;
-    onWriteFromScratch: () => void;
     onQuickPrompt: (prompt: string) => void;
+    onQuickPost: () => void;
 }
 
-export function EmptyStateDashboard({ onResearchIdeas, onWriteFromScratch, onQuickPrompt }: EmptyStateDashboardProps) {
+export function EmptyStateDashboard({ onResearchIdeas, onQuickPrompt, onQuickPost }: EmptyStateDashboardProps) {
 
     const suggestedPrompts = [
         "Write a post about AI trends in 2026",
@@ -52,22 +52,22 @@ export function EmptyStateDashboard({ onResearchIdeas, onWriteFromScratch, onQui
                 </Card>
 
                 <Card
-                    className="cursor-pointer hover:border-brand/30 hover:shadow-card-hover transition-all duration-300 group relative overflow-hidden"
-                    onClick={onWriteFromScratch}
+                    className="cursor-pointer border-brand/20 bg-brand/5 hover:bg-brand/10 hover:border-brand/40 hover:shadow-card-hover transition-all duration-300 group relative overflow-hidden"
+                    onClick={onQuickPost}
                 >
                     <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <PenTool className="w-24 h-24 text-brand" />
+                        <Zap className="w-24 h-24 text-brand" />
                     </div>
                     <CardHeader className="pb-2">
-                        <div className="mb-4 p-3 bg-brand/5 w-fit rounded-xl text-brand group-hover:bg-brand group-hover:text-white transition-colors duration-300">
-                            <PenTool className="w-6 h-6" />
+                        <div className="mb-4 p-3 bg-brand w-fit rounded-xl text-white group-hover:scale-110 transition-transform duration-300 shadow-sm">
+                            <Zap className="w-6 h-6" />
                         </div>
-                        <CardTitle className="text-2xl">Write from Scratch</CardTitle>
-                        <CardDescription className="text-base">Share your thoughts, I&apos;ll polish them</CardDescription>
+                        <CardTitle className="text-2xl text-brand-dark">Quick Post</CardTitle>
+                        <CardDescription className="text-base text-brand-dark/80">Fast-track: Idea to 3 Variants</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-charcoal-light leading-relaxed">
-                            Dump your raw ideas or voice notes, and I&apos;ll structure them into viral LinkedIn posts.
+                        <p className="text-brand-dark/70 leading-relaxed font-medium">
+                            Skip the chat. Enter an idea and get 3 distinct options (Bold, Pro, Casual) instantly.
                         </p>
                     </CardContent>
                 </Card>

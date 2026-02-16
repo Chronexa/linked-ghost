@@ -6,7 +6,8 @@
 import { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/with-auth';
 import { responses, errors } from '@/lib/api/response';
-import { getPagination, getSorting } from '@/lib/api/validate';
+import { getPagination, getSorting, validateBody } from '@/lib/api/validate';
+import { z } from 'zod';
 import { rateLimit } from '@/lib/api/rate-limit';
 import { db } from '@/lib/db';
 import { generatedDrafts, classifiedTopics, pillars } from '@/lib/db/schema';
@@ -83,5 +84,50 @@ export const GET = withAuth(async (req: NextRequest, { user }) => {
   } catch (error) {
     console.error('Error fetching drafts:', error);
     return errors.internal('Failed to fetch drafts');
+  }
+});
+
+const createDraftSchema = z.object({
+  content: z.string().min(1),
+  hook: z.string().optional(),
+  pillarId: z.string().uuid().optional(),
+  topicId: z.string().uuid().optional(),
+  metadata: z.record(z.any()).optional(),
+  userPerspective: z.string().optional(),
+  status: z.enum(['draft', 'scheduled', 'posted']).optional().default('draft'),
+});
+
+/**
+ * POST /api/drafts
+ * Create a new draft manually (e.g. from Quick Post)
+ */
+export const POST = withAuth(async (req: NextRequest, { user }) => {
+  try {
+    const validation = await validateBody(req, createDraftSchema);
+    if (!validation.success) return validation.error;
+
+    const { content, hook, pillarId, topicId, metadata, status } = validation.data;
+
+    // Check usage limits if necessary (though Quick Post generation already checked)
+    // We'll skip double checking here for now as saving is free, generation costs.
+
+    const [newDraft] = await db.insert(generatedDrafts).values({
+      userId: user.id,
+      pillarId: pillarId,
+      topicId: topicId,
+      fullText: content,
+      userPerspective: validation.data.userPerspective || content.substring(0, 100), // Ensure NOT NULL constraint
+      hook: hook || content.substring(0, 100), // Fallback hook
+      status: status as any,
+      metadata: metadata,
+      variantLetter: 'A', // Default to A for manual/quick posts
+      characterCount: content.length,
+    });
+
+    return responses.created(newDraft);
+
+  } catch (error) {
+    console.error('Error creating draft:', error);
+    return errors.internal('Failed to create draft');
   }
 });

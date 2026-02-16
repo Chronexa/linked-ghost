@@ -24,15 +24,20 @@ export function ChatInterface({ conversationId, initialTrigger }: ChatInterfaceP
     const router = useRouter();
     const scrollRef = useRef<HTMLDivElement>(null);
     const { messages, setMessages, loading: loadingMessages, refetch } = useConversation(conversationId);
-    const { sendMessage, searchIdeas, regenerateResearch, selectTopic, regenerateDrafts, isLoading: isSending } = useChat();
+    const { sendMessage, searchIdeas, regenerateResearch, selectTopic, regenerateDrafts, writeFromScratch, isLoading: isSending } = useChat();
     const { data: voiceExamples, isLoading: isLoadingVoice } = useVoiceExamples();
 
     const hasTriggeredRef = useRef(false);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [isDrafting, setIsDrafting] = useState(false);
+    // New state to track if we are in "Write from Scratch" mode
+    const [isWriteFromScratchMode, setIsWriteFromScratchMode] = useState(false);
 
     // Handle initial triggers
     useEffect(() => {
         if (initialTrigger && !hasTriggeredRef.current && !loadingMessages) {
             hasTriggeredRef.current = true;
+
             if (initialTrigger === 'research') {
                 // Optimistic message
                 const tempId = 'temp-research-' + Date.now();
@@ -49,6 +54,16 @@ export function ChatInterface({ conversationId, initialTrigger }: ChatInterfaceP
                     .catch(() => {
                         setMessages(prev => prev.filter(m => m.id !== tempId));
                     });
+            } else if (initialTrigger === 'write-scratch') {
+                // Activate Write from Scratch Mode
+                setIsWriteFromScratchMode(true);
+                setMessages(prev => [...prev, {
+                    id: 'temp-sys-intro-' + Date.now(),
+                    role: 'assistant',
+                    content: "I'm ready to write! ✍️\n\nShare your raw thoughts, bullet points, or a rough idea below, and I'll turn it into a polished LinkedIn post for you.",
+                    createdAt: new Date(),
+                    messageType: 'text'
+                }]);
             }
         }
     }, [initialTrigger, conversationId, loadingMessages, searchIdeas, refetch, setMessages]);
@@ -58,16 +73,18 @@ export function ChatInterface({ conversationId, initialTrigger }: ChatInterfaceP
         if (scrollRef.current) {
             scrollRef.current.scrollIntoView({ behavior: 'smooth' });
         }
-    }, [messages, isSending]);
+    }, [messages, isSending, isDrafting]); // Added isDrafting to dependancy
 
     // Polling for async generation
     useEffect(() => {
         const lastMessage = messages[messages.length - 1];
         // Check for specific processing flag we added in the API
-        const isProcessing = lastMessage?.metadata?.status === 'processing' ||
+        const processingState = lastMessage?.metadata?.status === 'processing' ||
             lastMessage?.metadata?.type === 'draft_generation_in_progress';
 
-        if (isProcessing && !loadingMessages) {
+        setIsProcessing(!!processingState);
+
+        if (processingState && !loadingMessages) {
             const interval = setInterval(() => {
                 refetch({ skipLoading: true });
             }, 3000); // Poll every 3 seconds
@@ -89,16 +106,31 @@ export function ChatInterface({ conversationId, initialTrigger }: ChatInterfaceP
         setMessages(prev => [...prev, newUserMsg]);
 
         try {
-            await sendMessage(conversationId, content);
-            await refetch(); // Sync with server including assistant response
+            if (isWriteFromScratchMode) {
+                // Handle Write from Scratch Flow
+                setIsDrafting(true);
+                await writeFromScratch(conversationId, content);
+                setIsWriteFromScratchMode(false); // Reset mode after submission
+                await refetch();
+            } else {
+                // Standard Chat Flow
+                await sendMessage(conversationId, content);
+                await refetch();
+            }
         } catch (err) {
             // Rollback or show error
             setMessages(prev => prev.filter(m => m.id !== tempId));
+            setIsDrafting(false); // Ensure drafting is off on error
+        } finally {
+            if (isWriteFromScratchMode) {
+                setIsDrafting(false);
+            }
         }
     };
 
     const handleSelectTopic = async (topicContent: string, sources: any[], userPerspective?: string) => {
         const tempId = Date.now().toString();
+        setIsDrafting(true); // Start drafting state immediately
         setMessages(prev => [...prev, {
             id: tempId,
             role: 'user',
@@ -119,6 +151,8 @@ export function ChatInterface({ conversationId, initialTrigger }: ChatInterfaceP
         } catch (err) {
             setMessages(prev => prev.filter(m => m.id !== tempId));
             console.error(err);
+        } finally {
+            setIsDrafting(false); // Handover to isProcessing or done
         }
     };
 
@@ -157,22 +191,26 @@ export function ChatInterface({ conversationId, initialTrigger }: ChatInterfaceP
                             <PerspectiveRequestMessage
                                 isLoading={isSending}
                                 onSubmit={(perspective) => {
+                                    setIsDrafting(true);
                                     // Pass context from metadata
                                     selectTopic(
                                         conversationId,
                                         msg.metadata.topicContent,
                                         msg.metadata.sources,
                                         perspective
-                                    ).then(() => refetch());
+                                    ).then(() => refetch())
+                                        .finally(() => setIsDrafting(false));
                                 }}
                                 onSkip={() => {
+                                    setIsDrafting(true);
                                     selectTopic(
                                         conversationId,
                                         msg.metadata.topicContent,
                                         msg.metadata.sources,
                                         undefined,
                                         true // skipPerspective
-                                    ).then(() => refetch());
+                                    ).then(() => refetch())
+                                        .finally(() => setIsDrafting(false));
                                 }}
                             />
                         )}
@@ -230,23 +268,43 @@ export function ChatInterface({ conversationId, initialTrigger }: ChatInterfaceP
                         messages.map((msg, idx) => renderMessage(msg, idx))
                     )}
 
-                    {isSending && (
+                    {(isSending || isProcessing || isDrafting) && (
                         <div className="flex w-full justify-start animate-in fade-in duration-300">
-                            <div className="flex items-center gap-3 bg-muted/40 border border-border/40 rounded-2xl px-4 py-3 rounded-tl-sm">
-                                <div className="flex gap-1">
-                                    <span className="w-1.5 h-1.5 bg-brand/60 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                    <span className="w-1.5 h-1.5 bg-brand/60 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                    <span className="w-1.5 h-1.5 bg-brand/60 rounded-full animate-bounce"></span>
+                            {/* Show Rich Drafting Skeleton if specifically processing drafts */}
+                            {(isProcessing || isDrafting) ? (
+                                <div className="w-full max-w-2xl bg-card border border-border/60 shadow-sm rounded-xl p-6 space-y-4">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="w-4 h-4 rounded-full bg-brand/20 animate-pulse"></div>
+                                        <span className="text-sm font-medium text-brand animate-pulse">Drafting your post...</span>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="h-4 bg-muted/50 rounded w-3/4 animate-pulse"></div>
+                                        <div className="h-4 bg-muted/50 rounded w-full animate-pulse"></div>
+                                        <div className="h-4 bg-muted/50 rounded w-5/6 animate-pulse"></div>
+                                    </div>
+                                    <div className="space-y-2 pt-2">
+                                        <div className="h-4 bg-muted/50 rounded w-2/3 animate-pulse"></div>
+                                        <div className="h-4 bg-muted/50 rounded w-full animate-pulse"></div>
+                                    </div>
                                 </div>
-                                <span className="text-xs font-medium text-muted-foreground">Thinking...</span>
-                            </div>
+                            ) : (
+                                /* Generic Thinking Bubble for other states */
+                                <div className="flex items-center gap-3 bg-muted/40 border border-border/40 rounded-2xl px-4 py-3 rounded-tl-sm">
+                                    <div className="flex gap-1">
+                                        <span className="w-1.5 h-1.5 bg-brand/60 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                        <span className="w-1.5 h-1.5 bg-brand/60 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                        <span className="w-1.5 h-1.5 bg-brand/60 rounded-full animate-bounce"></span>
+                                    </div>
+                                    <span className="text-xs font-medium text-muted-foreground">Thinking...</span>
+                                </div>
+                            )}
                         </div>
                     )}
                     <div ref={scrollRef} className="h-4" />
                 </div>
             </ScrollArea>
 
-            <div className="w-full bg-transparent pb-6 pt-2 px-4 z-10">
+            <div className="w-full bg-transparent pb-1 px-4 z-10">
                 <div className="max-w-3xl mx-auto">
                     <ChatInput onSend={handleSend} isLoading={isSending} />
                 </div>

@@ -22,9 +22,9 @@ export const PLAN_LIMITS = {
         voice_analysis: 20,
     },
     free_trial: {
-        posts: 5,
-        research: 10,
-        voice_analysis: 1,
+        posts: 50,
+        research: 50,
+        voice_analysis: 10,
     }
 };
 
