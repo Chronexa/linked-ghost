@@ -160,31 +160,61 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
         }).returning();
 
         // Enqueue the heavy lifting
-    },
-    userPerspective: userPerspective || "Write an engaging LinkedIn post about this topic.",
-        voiceExamples: examples.map((ex) => ({
-            postText: ex.postText,
-            embedding: ex.embedding, // Pass embedding if available, otherwise worker might need to re-fetch or generate? Worker has logic.
-        })),
+        try {
+            console.log('🚀 Enqueuing generation job for conversation:', conversationId);
+            await enqueueGeneration({
+                userId: user.id,
+                conversationId,
+                messageId: assistantDraftMessage.id,
+                topicId: newTopic.id,
+                pillarId: effectivePillarId,
+                pillarContext: {
+                    name: pillar.name,
+                    description: pillar.description || undefined,
+                    tone: pillar.tone || undefined,
+                    targetAudience: pillar.targetAudience || profile?.targetAudience || undefined,
+                    customPrompt: pillar.customPrompt || undefined,
+                },
+                topicContent: {
+                    title: topicContent,
+                    summary: sources?.map((s: any) => s.snippet).join('\n') || undefined,
+                },
+                userPerspective: userPerspective || "Write an engaging LinkedIn post about this topic.",
+                voiceExamples: examples.map((ex) => ({
+                    postText: ex.postText,
+                    embedding: ex.embedding,
+                })),
+                numVariants: 1,
+            });
+            console.log('✅ Job successfully enqueued');
+        } catch (queueError) {
+            console.error('❌ Failed to enqueue generation job:', queueError);
+            // Update the message to show error state
+            await db.update(conversationMessages).set({
+                content: "I encountered a connection error while starting the draft generation. Please report this to support.",
+                metadata: { error: queueError instanceof Error ? queueError.message : String(queueError) }
+            }).where(eq(conversationMessages.id, assistantDraftMessage.id));
+
+            throw queueError;
+        }
+
+        // Increment usage (we assume success or handle refund in worker on failure?)
+        // Better to increment here to prevent abuse.
+        await incrementUsage(user.id, 'generate_post', 2);
+
+        // Update conversation
+        await db.update(conversations).set({
+            lastMessagePreview: `Generating drafts for "${topicContent}"...`,
+            updatedAt: new Date()
+        }).where(eq(conversations.id, conversationId));
+
+        return responses.accepted({
+            messageId: assistantDraftMessage.id,
+            status: 'processing'
         });
 
-// Increment usage (we assume success or handle refund in worker on failure?)
-// Better to increment here to prevent abuse.
-await incrementUsage(user.id, 'generate_post', 2);
-
-// Update conversation
-await db.update(conversations).set({
-    lastMessagePreview: `Generating drafts for "${topicContent}"...`,
-    updatedAt: new Date()
-}).where(eq(conversations.id, conversationId));
-
-return responses.accepted({
-    messageId: assistantDraftMessage.id,
-    status: 'processing'
-});
-
     } catch (error) {
-    console.error('Error in select-topic:', error);
-    return errors.internal('Failed to process topic selection');
-}
+        console.error('Error in select-topic:', error);
+        return errors.internal('Failed to process topic selection');
+    }
 });
