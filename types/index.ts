@@ -41,6 +41,8 @@ export interface Pillar {
   description: string | null;
   tone: string | null;
   targetAudience: string | null;
+  positioning: string | null;
+  cta: string | null;
   status: 'active' | 'inactive';
   createdAt: Date;
   updatedAt: Date;
@@ -57,6 +59,7 @@ export interface VoiceExample {
   postText: string;
   characterCount: number;
   status: 'active' | 'archived';
+  source?: 'own_post' | 'reference';
   createdAt: Date;
 }
 
@@ -185,8 +188,10 @@ export interface Subscription {
   id: string;
   userId: string;
   tier: SubscriptionTier;
+  planName?: string; // Derived field often added by API
   status: SubscriptionStatus;
   postsLimit: number;
+  monthlyPostLimit?: number; // Alias often added by API
   postsUsed: number;
   pillarsLimit: number;
   currentPeriodStart: Date;

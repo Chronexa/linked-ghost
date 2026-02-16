@@ -10,6 +10,22 @@ import { getPrompt, PROMPT_KEYS } from '@/lib/prompts/store';
 import { db } from '@/lib/db';
 import { profiles } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
+
+// Schema for OpenAI response validation
+const openAIResponseSchema = z.object({
+  variants: z.array(z.object({
+    letter: z.enum(['A', 'B', 'C']),
+    style: z.string(),
+    fullText: z.string(),
+    hook: z.string(),
+    body: z.string(),
+    cta: z.string(),
+    hashtags: z.array(z.string()).optional()
+  }))
+});
+
+
 
 /**
  * Structure of a LinkedIn post
@@ -261,7 +277,23 @@ export async function generateDraftVariants(params: {
   }
 
   // Parse the JSON response
-  const parsed = JSON.parse(completion);
+  // Parse the JSON response
+  let parsed: any;
+  try {
+    parsed = JSON.parse(completion);
+    // Validate structure
+    const validation = openAIResponseSchema.safeParse(parsed);
+    if (!validation.success) {
+      console.error("OpenAI Response Schema Validation Failed:", validation.error);
+      // Fallback: Check if we have at least an array-like structure
+      if (!Array.isArray(parsed?.variants)) {
+        throw new Error('Invalid response structure: ' + completion.substring(0, 100));
+      }
+    }
+  } catch (e) {
+    console.error("JSON Parse Error or Validation Error:", e);
+    throw new Error('Failed to parse OpenAI response');
+  }
   const variants: DraftVariant[] = [];
 
   // Process each variant

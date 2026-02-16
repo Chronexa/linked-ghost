@@ -66,7 +66,7 @@ export function QuickPostForm({ onSubmit, isGenerating }: QuickPostFormProps) {
             {/* Quick Idea Input */}
             <div className="space-y-2">
                 <Label htmlFor="idea" className="text-base font-semibold">
-                    What's on your mind? <span className="text-red-500">*</span>
+                    What&apos;s on your mind? <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
                     id="idea"

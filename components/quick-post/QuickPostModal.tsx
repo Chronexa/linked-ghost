@@ -90,6 +90,10 @@ export function QuickPostModal({ isOpen, onClose }: QuickPostModalProps) {
             if (draft && draft.data && draft.data.id) {
                 router.push('/drafts');
                 onClose();
+            } else {
+                console.error('Invalid draft response:', draft);
+                toast.error('Draft saved but response was invalid');
+                setIsSaving(false);
             }
         } catch (error: any) {
             console.error('Saving error:', error);

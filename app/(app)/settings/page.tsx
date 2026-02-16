@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { ProfileSettings } from '@/components/profile/ProfileSettings';
 import { Sparkles } from 'lucide-react';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
+import { User, Profile, Subscription, Pillar, VoiceExample } from '@/types';
 
 type SettingsTab = 'profile' | 'pillars' | 'voice' | 'prompts' | 'integrations' | 'billing';
 
@@ -52,10 +53,10 @@ function SettingsContent() {
     if (tab) setActiveTab(tab);
   }, [searchParams]);
 
-  const { data: userData } = useUser();
-  const { data: subscriptionData } = useSubscription();
-  const { data: pillarsData } = usePillars({ status: 'active' });
-  const { data: examplesData } = useVoiceExamples();
+  const { data: userDataResponse } = useUser();
+  const { data: subscriptionDataResponse } = useSubscription();
+  const { data: pillarsDataResponse } = usePillars({ status: 'active' });
+  const { data: examplesDataResponse } = useVoiceExamples();
   const updateProfile = useUpdateProfile();
   const createPillar = useCreatePillar();
   const updatePillar = useUpdatePillar();
@@ -64,11 +65,13 @@ function SettingsContent() {
   const deleteExample = useDeleteVoiceExample();
   const analyzeVoice = useAnalyzeVoice();
 
-  const user = (userData as any)?.data?.user;
-  const profile = (userData as any)?.data?.profile;
-  const subscription = (subscriptionData as any)?.data;
-  const pillars = (pillarsData as any)?.data ?? [];
-  const examples = (examplesData as any)?.data ?? [];
+  // Safely extract and cast data
+  const user = (userDataResponse as any)?.data?.user as User | undefined;
+  const profile = (userDataResponse as any)?.data?.profile as Profile | undefined;
+  const subscription = (subscriptionDataResponse as any)?.data as Subscription | undefined;
+
+  const pillars: Pillar[] = ((pillarsDataResponse as any)?.data ?? []) as Pillar[];
+  const examples: VoiceExample[] = ((examplesDataResponse as any)?.data ?? []) as VoiceExample[];
 
   const [pillarForm, setPillarForm] = useState<{
     name: string;
@@ -105,11 +108,12 @@ function SettingsContent() {
     if (profile) {
       setAccountData({
         linkedinUrl: profile.linkedinUrl || '',
-        linkedinHeadline: (profile as { linkedinHeadline?: string | null }).linkedinHeadline ?? '',
-        linkedinSummary: (profile as { linkedinSummary?: string | null }).linkedinSummary ?? '',
-        targetAudience: profile.targetAudience || '',
-        writingStyle: profile.writingStyle || '',
+        linkedinHeadline: (profile as any).linkedinHeadline ?? '', // Type definition might need update if these fields are missing
+        linkedinSummary: (profile as any).linkedinSummary ?? '',
+        targetAudience: (profile as any).targetAudience || '',
+        writingStyle: (profile as any).writingStyle || '',
       });
+      // casting profile to any here because defaultInstructions might not be in the Profile interface yet
       setDefaultInstructions((profile as any).defaultInstructions ?? '');
     }
   }, [profile]);
@@ -260,7 +264,7 @@ function SettingsContent() {
                 {pillars.length === 0 && (
                   <li className="py-4 text-sm text-muted-foreground">No pillars yet. Add one above.</li>
                 )}
-                {pillars.map((p: any) => (
+                {pillars.map((p: Pillar) => (
                   <li key={p.id} className="py-4 flex items-start justify-between gap-4">
                     <div>
                       <p className="font-medium text-foreground">{p.name}</p>
@@ -373,20 +377,22 @@ function SettingsContent() {
                     Analyze voice
                   </Button>
                 </div>
-                {profile?.voiceConfidenceScore != null && (
+                {profile?.voiceConfidence != null && (
+                  // Adjusted property name from voiceConfidenceScore to voiceConfidence as per type definition
                   <p className="text-xs text-muted-foreground mb-2">
-                    Voice confidence: {profile.voiceConfidenceScore}%
+                    Voice confidence: {profile.voiceConfidence}%
                   </p>
                 )}
                 <ul className="space-y-2">
                   {examples.length === 0 && (
                     <li className="text-sm text-muted-foreground">No examples yet.</li>
                   )}
-                  {examples.slice(0, 10).map((ex: any) => (
+                  {examples.slice(0, 10).map((ex: VoiceExample) => (
                     <li key={ex.id} className="flex items-start justify-between gap-2 p-3 rounded-lg bg-background">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-foreground line-clamp-2">{ex.postText}</p>
-                        {ex.source === 'reference' && (
+                        {(ex as any).source === 'reference' && (
+                          // Source might not be in VoiceExample type
                           <Badge variant="neutral" className="mt-1 text-xs">Reference</Badge>
                         )}
                       </div>
@@ -572,17 +578,17 @@ function SettingsContent() {
                     <span className="text-muted-foreground">Voice examples</span>
                     <span className="font-medium text-foreground">{examples.length}</span>
                   </div>
-                  {profile?.voiceConfidenceScore != null && (
+                  {profile?.voiceConfidence != null && (
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Voice confidence</span>
                       <div className="flex items-center gap-2">
                         <div className="w-24 h-2 bg-border rounded-full overflow-hidden">
                           <div
                             className="h-full bg-brand rounded-full"
-                            style={{ width: `${profile.voiceConfidenceScore}%` }}
+                            style={{ width: `${profile.voiceConfidence}%` }}
                           />
                         </div>
-                        <span className="font-medium text-foreground w-8">{profile.voiceConfidenceScore}%</span>
+                        <span className="font-medium text-foreground w-8">{profile.voiceConfidence}%</span>
                       </div>
                     </div>
                   )}
@@ -595,3 +601,4 @@ function SettingsContent() {
     </div>
   );
 }
+

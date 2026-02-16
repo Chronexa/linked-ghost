@@ -2,13 +2,20 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui';
+import { Button, Card, CardContent, CardHeader, Badge } from '@/components/ui';
 import { Select } from '@/components/ui/select-custom';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FileText, CheckCircle2, Calendar, Send } from 'lucide-react';
 import { useDrafts, useApproveDraft } from '@/lib/hooks/use-drafts';
 import { usePillars } from '@/lib/hooks/use-pillars';
 import { formatRelativeTime } from '@/lib/utils';
+import { Draft, Pillar } from '@/types';
+
+// Define the response structure if not exported from hooks (or cast to unknown first)
+// Ideally hooks should return typed data.
+// Based on usage: draftsData is ApiResponse<PaginatedResponse<Draft>> or similar
+// Inspecting previous code: (draftsData as any)?.data ?? (draftsData as any)?.data?.data
+// usage elsewhere implies draftsData IS the response, and .data IS the payload.
 
 const getStatusBadge = (status: string) => {
   const variants = {
@@ -25,29 +32,60 @@ export default function DraftsPage() {
   const [filterPillar, setFilterPillar] = useState<string>('all');
 
   // Fetch drafts and pillars from APIs
-  const { data: draftsData, isLoading: draftsLoading } = useDrafts({ limit: 100 });
-  const { data: pillarsData } = usePillars({ status: 'active' });
+  const { data: draftsDataResponse, isLoading: draftsLoading } = useDrafts({ limit: 100 });
+  const { data: pillarsDataResponse } = usePillars({ status: 'active' });
   const approveDraft = useApproveDraft();
 
-  const drafts = useMemo(() => (draftsData as any)?.data ?? (draftsData as any)?.data?.data ?? [], [draftsData]);
-  const pillars = useMemo(() => (pillarsData as any)?.data ?? (pillarsData as any)?.data?.data ?? [], [pillarsData]);
+  // Safely extract data with type assertions for now, assuming hook response structure
+  // In a full refactor, useDrafts should return Draft[] directly or a typed response.
+  const drafts = useMemo(() => {
+    // Check if draftsDataResponse is valid and has data
+    if (!draftsDataResponse) return [] as Draft[];
+    // Handle potential nesting (ApiResponse wrapping PaginatedResponse or array)
+    // Adjust based on actual API response structure observed in logs/previous code
+    // Pattern seen: data?.data (if paginated response inside api response) or data (if direct array inside api response)
+    const payload = (draftsDataResponse as any).data;
+    if (Array.isArray(payload)) return payload as Draft[];
+    if (payload?.data && Array.isArray(payload.data)) return payload.data as Draft[];
+    return [] as Draft[];
+  }, [draftsDataResponse]);
+
+  const pillars = useMemo(() => {
+    if (!pillarsDataResponse) return [] as Pillar[];
+    const payload = (pillarsDataResponse as any).data;
+    if (Array.isArray(payload)) return payload as Pillar[];
+    return [] as Pillar[];
+  }, [pillarsDataResponse]);
 
   // Client-side filtering
   const filteredDrafts = useMemo(() => {
-    return drafts.filter((draft: any) => {
+    return drafts.filter((draft: Draft) => {
+      // cast status to string for comparison if needed, or update Draft type
       if (filterStatus !== 'all' && draft.status !== filterStatus) return false;
-      if (filterPillar !== 'all' && draft.pillarId !== filterPillar) return false;
+      if (filterPillar !== 'all' && getDraftPillarId(draft) !== filterPillar) return false;
       return true;
     });
   }, [drafts, filterStatus, filterPillar]);
 
+  // Helper to safely get pillarId (it might be on the draft object directly)
+  // Type definition says `topicId` but schema has `pillarId`. 
+  // Let's assume the component was working meaning `pillarId` exists on the object even if type definition is missing it.
+  // We should update the type definition later. For now, we cast.
+  function getDraftPillarId(draft: Draft): string | undefined {
+    return (draft as any).pillarId;
+  }
+
+  function getDraftPillarName(draft: Draft): string | undefined {
+    return (draft as any).pillarName;
+  }
+
   // Calculate status counts
   const statusCounts = useMemo(() => {
     return {
-      draft: drafts.filter((d: any) => d.status === 'draft').length,
-      approved: drafts.filter((d: any) => d.status === 'approved').length,
-      scheduled: drafts.filter((d: any) => d.status === 'scheduled').length,
-      posted: drafts.filter((d: any) => d.status === 'posted').length,
+      draft: drafts.filter((d) => d.status === 'draft').length,
+      approved: drafts.filter((d) => d.status === 'approved').length,
+      scheduled: drafts.filter((d) => d.status === 'scheduled').length,
+      posted: drafts.filter((d) => d.status === 'posted').length,
     };
   }, [drafts]);
 
@@ -69,7 +107,7 @@ export default function DraftsPage() {
 
   const pillarOptions = [
     { label: 'All Pillars', value: 'all' },
-    ...pillars.map((p: any) => ({ label: p.name, value: p.id })),
+    ...pillars.map((p) => ({ label: p.name, value: p.id })),
   ];
 
   return (
@@ -163,7 +201,7 @@ export default function DraftsPage() {
       {/* Drafts List */}
       {!draftsLoading && filteredDrafts.length > 0 && (
         <div className="grid gap-4">
-          {filteredDrafts.map((draft: any) => (
+          {filteredDrafts.map((draft: Draft) => (
             <Card key={draft.id} hover className="group transition-all">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -173,9 +211,9 @@ export default function DraftsPage() {
                         {draft.variantLetter}
                       </span>
                     </div>
-                    {draft.pillarName && (
+                    {getDraftPillarName(draft) && (
                       <Badge variant="outline" className="text-muted-foreground border-border bg-transparent">
-                        {draft.pillarName}
+                        {getDraftPillarName(draft)}
                       </Badge>
                     )}
                     <Badge variant={getStatusBadge(draft.status)} className="capitalize">

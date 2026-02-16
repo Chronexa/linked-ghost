@@ -108,12 +108,22 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
 
     const { content, hook, pillarId, topicId, metadata, status } = validation.data;
 
+    // Resolve Pillar if not provided (required by DB)
+    let effectivePillarId = pillarId;
+    if (!effectivePillarId) {
+      const firstPillar = await db.query.pillars.findFirst({
+        where: and(eq(pillars.userId, user.id), eq(pillars.status, 'active'))
+      });
+      if (!firstPillar) return errors.badRequest('Referenced pillar not found and no active pillars available.');
+      effectivePillarId = firstPillar.id;
+    }
+
     // Check usage limits if necessary (though Quick Post generation already checked)
     // We'll skip double checking here for now as saving is free, generation costs.
 
     const [newDraft] = await db.insert(generatedDrafts).values({
       userId: user.id,
-      pillarId: pillarId,
+      pillarId: effectivePillarId,
       topicId: topicId,
       fullText: content,
       userPerspective: validation.data.userPerspective || content.substring(0, 100), // Ensure NOT NULL constraint
@@ -122,7 +132,7 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
       metadata: metadata,
       variantLetter: 'A', // Default to A for manual/quick posts
       characterCount: content.length,
-    });
+    }).returning();
 
     return responses.created(newDraft);
 

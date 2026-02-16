@@ -59,6 +59,10 @@ export function initWorker(queueName: string) {
         console.error(`❌ Job ${job?.id} failed in queue ${queueName}:`, err);
     });
 
+    worker.on('error', (err: Error) => {
+        console.error(`❌ Worker error in queue ${queueName}:`, err);
+    });
+
     workers[queueName] = worker;
     return worker;
 }

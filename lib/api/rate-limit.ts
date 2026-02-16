@@ -51,12 +51,21 @@ export async function rateLimit(
   const identifier = userId || getClientId(req);
   const limit = rateLimits[tier];
 
-  const { allowed, remaining } = await checkRateLimit(
-    identifier,
-    endpoint,
-    limit.requests,
-    limit.window
-  );
+  let result;
+  try {
+    result = await checkRateLimit(
+      identifier,
+      endpoint,
+      limit.requests,
+      limit.window
+    );
+  } catch (error) {
+    console.error('Rate limit check failed:', error);
+    // Fail open: Allow request if rate limiting fails (e.g., Redis down)
+    return null;
+  }
+
+  const { allowed, remaining } = result;
 
   if (!allowed) {
     return errors.rateLimit(

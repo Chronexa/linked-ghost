@@ -97,7 +97,6 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
             () => generateDraftVariants({
                 topicTitle: topicTitle,
                 topicDescription: "User's raw thoughts: " + rawThoughts,
-                topicDescription: "User's raw thoughts: " + rawThoughts,
                 userPerspective: "CORE CONTENT / RAW THOUGHTS:\n" + rawThoughts + "\n\nINSTRUCTION: Expand these thoughts into a full post.", // Explicit instruction
                 pillarName: pillar.name,
                 pillarDescription: pillar.description || undefined,
@@ -134,7 +133,7 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
             qualityWarnings: variant.qualityWarnings,
         }));
 
-        const createdDrafts = await db.insert(generatedDrafts).values(draftsToInsert).returning();
+        const createdDrafts = await db.insert(generatedDrafts).values(draftsToInsert as any).returning();
 
         // Increment usage
         await incrementUsage(user.id, 'generate_post', 2);

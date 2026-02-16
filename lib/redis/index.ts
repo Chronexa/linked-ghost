@@ -8,7 +8,7 @@ function getRedisClient(): Redis {
     if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
       throw new Error('UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set in environment variables');
     }
-    
+
     _redis = new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL,
       token: process.env.UPSTASH_REDIS_REST_TOKEN,
@@ -141,8 +141,13 @@ export async function checkRateLimit(
     const remaining = Math.max(0, limit - current);
 
     return { allowed, remaining };
-  } catch (error) {
-    console.error('Rate limit check error:', error);
+  } catch (error: any) {
+    // If Upstash quota is exceeded, just log a warning and fail open
+    if (error?.message?.includes('ERR max requests limit exceeded')) {
+      console.warn('Redis rate limit quota exceeded. Failing open.');
+    } else {
+      console.error('Rate limit check error:', error);
+    }
     // On error, allow the request (fail open)
     return { allowed: true, remaining: limit };
   }
