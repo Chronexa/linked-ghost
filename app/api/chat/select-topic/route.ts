@@ -6,7 +6,7 @@ import { db } from '@/lib/db';
 import { conversationMessages, conversations, classifiedTopics, generatedDrafts, voiceExamples, pillars, profiles } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
-import { estimateEngagement } from '@/lib/ai/generation';
+import { estimateEngagement, generateDraftVariants } from '@/lib/ai/generation';
 import { enqueueGeneration } from '@/lib/queue';
 import { checkUsageLimit, incrementUsage } from '@/lib/ai/usage';
 
@@ -129,12 +129,7 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
             })
             .slice(0, 10);
 
-        // Relaxed Constraint: Allow generation with fewer examples (warn or use generic)
-        // if (examples.length < 3) { ... } -> Removed strict check
-
         const profile = await db.query.profiles.findFirst({ where: eq(profiles.userId, user.id) });
-        // Relaxed Constraint: Allow generation without embedding
-        // if (!profile?.voiceEmbedding) { ... } -> Removed strict check
 
         // Check usage limits before generation
         const usageCheck = await checkUsageLimit(user.id, 'generate_post');
@@ -187,15 +182,93 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
                 numVariants: 1,
             });
             console.log('✅ Job successfully enqueued');
-        } catch (queueError) {
+        } catch (queueError: any) {
             console.error('❌ Failed to enqueue generation job:', queueError);
-            // Update the message to show error state
-            await db.update(conversationMessages).set({
-                content: "I encountered a connection error while starting the draft generation. Please report this to support.",
-                metadata: { error: queueError instanceof Error ? queueError.message : String(queueError) }
-            }).where(eq(conversationMessages.id, assistantDraftMessage.id));
 
-            throw queueError;
+            // FALLBACK: If Queue Fails (e.g. Redis limits), run Synchronously
+            // This is slower (clients wait) but ensures reliability.
+            if (queueError?.message?.includes('requests limit exceeded') || queueError?.message?.includes('ECONNREFUSED')) {
+                console.warn('⚠️ Switching to SYNCHRONOUS generation fallback due to Queue failure.');
+
+                try {
+                    // 1. Run Generation Direct
+                    const result = await generateDraftVariants({
+                        topicTitle: topicContent,
+                        topicDescription: sources?.map((s: any) => s.snippet).join('\n') || undefined,
+                        userPerspective: userPerspective || 'Write an engaging LinkedIn post about this topic.',
+                        pillarName: pillar.name,
+                        pillarDescription: pillar.description || undefined,
+                        pillarTone: pillar.tone || undefined,
+                        targetAudience: pillar.targetAudience || profile?.targetAudience || undefined,
+                        customPrompt: pillar.customPrompt || undefined,
+                        voiceExamples: examples.map((ex) => ({
+                            postText: ex.postText,
+                            embedding: ex.embedding as number[] | undefined,
+                        })),
+                        userId: user.id,
+                        numVariants: 1
+                    });
+
+                    // 2. Save Drafts
+                    const draftInserts = result.variants.map((variant) => ({
+                        userId: user.id,
+                        conversationId,
+                        topicId: newTopic.id,
+                        pillarId: effectivePillarId,
+                        userPerspective: userPerspective || 'Write an engaging LinkedIn post about this topic.',
+                        variantLetter: variant.variantLetter,
+                        fullText: variant.post.fullText,
+                        hook: variant.post.hook,
+                        body: variant.post.body,
+                        cta: variant.post.cta,
+                        hashtags: variant.post.hashtags,
+                        characterCount: variant.post.characterCount,
+                        estimatedEngagement: estimateEngagement(variant.post),
+                        status: 'draft' as const,
+                    }));
+
+                    const createdDrafts = await db.insert(generatedDrafts).values(draftInserts).returning();
+
+                    // 3. Update Message to "Done"
+                    await db.update(conversationMessages).set({
+                        content: `I've drafted posts for you about "${topicContent}".`,
+                        messageType: 'draft_variants',
+                        metadata: {
+                            drafts: createdDrafts.map((d, i) => ({
+                                ...d,
+                                style: result.variants[i].style,
+                                voiceMatchScore: result.variants[i].voiceMatchScore,
+                                qualityWarnings: result.variants[i].qualityWarnings
+                            }))
+                        }
+                    }).where(eq(conversationMessages.id, assistantDraftMessage.id));
+
+                    // 4. Update Conversation Preview
+                    await db.update(conversations).set({
+                        lastMessagePreview: `Generated drafts for "${topicContent}"`,
+                        updatedAt: new Date()
+                    }).where(eq(conversations.id, conversationId));
+
+                    console.log('✅ Synchronous fallback completed successfully.');
+
+                } catch (syncError) {
+                    console.error('❌ Synchronous fallback also failed:', syncError);
+                    // Update the message to show error state
+                    await db.update(conversationMessages).set({
+                        content: "I encountered a connection error while starting the draft generation. Please report this to support.",
+                        metadata: { error: queueError instanceof Error ? queueError.message : String(queueError) }
+                    }).where(eq(conversationMessages.id, assistantDraftMessage.id));
+                    throw queueError; // Throw original error
+                }
+            } else {
+                // Update the message to show error state if it wasn't a queue connection issue we could handle
+                await db.update(conversationMessages).set({
+                    content: "I encountered a connection error while starting the draft generation. Please report this to support.",
+                    metadata: { error: queueError instanceof Error ? queueError.message : String(queueError) }
+                }).where(eq(conversationMessages.id, assistantDraftMessage.id));
+
+                throw queueError;
+            }
         }
 
         // Increment usage (we assume success or handle refund in worker on failure?)
