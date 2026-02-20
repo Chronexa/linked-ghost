@@ -192,89 +192,87 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
         } catch (queueError: any) {
             console.error('❌ Failed to enqueue generation job:', queueError);
 
-            // FALLBACK: If Queue Fails (e.g. Redis limits), run Synchronously
-            // This is slower (clients wait) but ensures reliability.
-            if (queueError?.message?.includes('requests limit exceeded') || queueError?.message?.includes('ECONNREFUSED')) {
-                console.warn('⚠️ Switching to SYNCHRONOUS generation fallback due to Queue failure.');
+            // FALLBACK: Run synchronously if queue is unavailable for ANY reason
+            // (env bypass, Redis limits, connection refused, etc.)
+            console.warn('⚠️ Switching to SYNCHRONOUS generation fallback.');
 
-                try {
-                    // 1. Run Generation Direct
-                    const result = await generateDraftVariants({
-                        topicTitle: topicContent,
-                        topicDescription: sources?.map((s: any) => s.snippet).join('\n') || undefined,
-                        userPerspective: userPerspective || 'Write an engaging LinkedIn post about this topic.',
-                        pillarName: pillar.name,
-                        pillarDescription: pillar.description || undefined,
-                        pillarTone: pillar.tone || undefined,
-                        targetAudience: pillar.targetAudience || profile?.targetAudience || undefined,
-                        customPrompt: pillar.customPrompt || undefined,
-                        voiceExamples: examples.map((ex) => ({
-                            postText: ex.postText,
-                            embedding: ex.embedding as number[] | undefined,
-                        })),
-                        userId: user.id,
-                        numVariants: 1
-                    });
+            try {
+                // 1. Run Generation Direct
+                const result = await generateDraftVariants({
+                    topicTitle: topicContent,
+                    topicDescription: sources?.map((s: any) => s.snippet).join('\n') || undefined,
+                    userPerspective: userPerspective || 'Write an engaging LinkedIn post about this topic.',
+                    pillarName: pillar.name,
+                    pillarDescription: pillar.description || undefined,
+                    pillarTone: pillar.tone || undefined,
+                    targetAudience: pillar.targetAudience || profile?.targetAudience || undefined,
+                    customPrompt: pillar.customPrompt || undefined,
+                    voiceExamples: examples.map((ex) => ({
+                        postText: ex.postText,
+                        embedding: ex.embedding as number[] | undefined,
+                    })),
+                    userId: user.id,
+                    numVariants: 1
+                });
 
-                    // 2. Save Drafts
-                    const draftInserts = result.variants.map((variant) => ({
-                        userId: user.id,
-                        conversationId,
-                        topicId: newTopic.id,
-                        pillarId: effectivePillarId,
-                        userPerspective: userPerspective || 'Write an engaging LinkedIn post about this topic.',
-                        variantLetter: variant.variantLetter,
-                        fullText: variant.post.fullText,
-                        hook: variant.post.hook,
-                        body: variant.post.body,
-                        cta: variant.post.cta,
-                        hashtags: variant.post.hashtags,
-                        characterCount: variant.post.characterCount,
-                        estimatedEngagement: estimateEngagement(variant.post),
-                        status: 'draft' as const,
-                    }));
+                // 2. Save Drafts
+                const draftInserts = result.variants.map((variant) => ({
+                    userId: user.id,
+                    conversationId,
+                    topicId: newTopic.id,
+                    pillarId: effectivePillarId,
+                    userPerspective: userPerspective || 'Write an engaging LinkedIn post about this topic.',
+                    variantLetter: variant.variantLetter,
+                    fullText: variant.post.fullText,
+                    hook: variant.post.hook,
+                    body: variant.post.body,
+                    cta: variant.post.cta,
+                    hashtags: variant.post.hashtags,
+                    characterCount: variant.post.characterCount,
+                    estimatedEngagement: estimateEngagement(variant.post),
+                    status: 'draft' as const,
+                }));
 
-                    const createdDrafts = await db.insert(generatedDrafts).values(draftInserts).returning();
+                const createdDrafts = await db.insert(generatedDrafts).values(draftInserts).returning();
 
-                    // 3. Update Message to "Done"
-                    await db.update(conversationMessages).set({
-                        content: `I've drafted posts for you about "${topicContent}".`,
-                        messageType: 'draft_variants',
-                        metadata: {
-                            drafts: createdDrafts.map((d, i) => ({
-                                ...d,
-                                style: result.variants[i].style,
-                                voiceMatchScore: result.variants[i].voiceMatchScore,
-                                qualityWarnings: result.variants[i].qualityWarnings
-                            }))
-                        }
-                    }).where(eq(conversationMessages.id, assistantDraftMessage.id));
-
-                    // 4. Update Conversation Preview
-                    await db.update(conversations).set({
-                        lastMessagePreview: `Generated drafts for "${topicContent}"`,
-                        updatedAt: new Date()
-                    }).where(eq(conversations.id, conversationId));
-
-                    console.log('✅ Synchronous fallback completed successfully.');
-
-                } catch (syncError) {
-                    console.error('❌ Synchronous fallback also failed:', syncError);
-                    // Update the message to show error state
-                    await db.update(conversationMessages).set({
-                        content: "I encountered a connection error while starting the draft generation. Please report this to support.",
-                        metadata: { error: queueError instanceof Error ? queueError.message : String(queueError) }
-                    }).where(eq(conversationMessages.id, assistantDraftMessage.id));
-                    throw queueError; // Throw original error
-                }
-            } else {
-                // Update the message to show error state if it wasn't a queue connection issue we could handle
+                // 3. Update Message to "Done"
                 await db.update(conversationMessages).set({
-                    content: "I encountered a connection error while starting the draft generation. Please report this to support.",
-                    metadata: { error: queueError instanceof Error ? queueError.message : String(queueError) }
+                    content: `I've drafted posts for you about "${topicContent}".`,
+                    messageType: 'draft_variants',
+                    metadata: {
+                        drafts: createdDrafts.map((d, i) => ({
+                            ...d,
+                            style: result.variants[i].style,
+                            voiceMatchScore: result.variants[i].voiceMatchScore,
+                            qualityWarnings: result.variants[i].qualityWarnings
+                        }))
+                    }
                 }).where(eq(conversationMessages.id, assistantDraftMessage.id));
 
-                throw queueError;
+                // 4. Update Conversation Preview
+                await db.update(conversations).set({
+                    lastMessagePreview: `Generated drafts for "${topicContent}"`,
+                    updatedAt: new Date()
+                }).where(eq(conversations.id, conversationId));
+
+                // 5. Increment usage
+                await incrementUsage(user.id, 'generate_post', 1);
+
+                console.log('✅ Synchronous fallback completed successfully.');
+
+                return responses.ok({
+                    messageId: assistantDraftMessage.id,
+                    status: 'completed'
+                });
+
+            } catch (syncError) {
+                console.error('❌ Synchronous fallback also failed:', syncError);
+                // Update the message to show error state
+                await db.update(conversationMessages).set({
+                    content: "I encountered an error while generating your draft. Please try again.",
+                    metadata: { error: syncError instanceof Error ? syncError.message : String(syncError) }
+                }).where(eq(conversationMessages.id, assistantDraftMessage.id));
+                throw syncError;
             }
         }
 
