@@ -64,6 +64,13 @@
       "when": 1771235083362,
       "tag": "0008_vengeful_squirrel_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1771580071033,
+      "tag": "0009_empty_elektra",
+      "breakpoints": true
     }
   ]
 }

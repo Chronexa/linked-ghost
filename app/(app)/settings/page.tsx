@@ -29,6 +29,7 @@ import {
 import { useUser, useUpdateProfile, useSubscription } from '@/lib/hooks/use-user';
 import { cn } from '@/lib/utils';
 import { ProfileSettings } from '@/components/profile/ProfileSettings';
+import { BillingSettings } from '@/components/settings/billing-settings';
 import { Sparkles } from 'lucide-react';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { User, Profile, Subscription, Pillar, VoiceExample } from '@/types';
@@ -538,64 +539,7 @@ function SettingsContent() {
         )}
 
         {activeTab === 'billing' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Billing</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Current plan and usage
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="p-6 rounded-xl bg-brand/5 border border-brand/20">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <h3 className="font-display text-xl font-semibold text-foreground">
-                      {subscription?.planName || 'Free'}
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {subscription?.status || 'Active'}
-                    </p>
-                  </div>
-                  {subscription?.monthlyPostLimit != null && (
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-brand">{subscription.monthlyPostLimit}</div>
-                      <div className="text-xs text-muted-foreground">posts / month</div>
-                    </div>
-                  )}
-                </div>
-                <Button variant="secondary" size="sm" className="mt-4">
-                  Upgrade plan
-                </Button>
-              </div>
-              <div>
-                <h4 className="font-medium text-foreground mb-3">Usage</h4>
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Content pillars</span>
-                    <span className="font-medium text-foreground">{pillars.length}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Voice examples</span>
-                    <span className="font-medium text-foreground">{examples.length}</span>
-                  </div>
-                  {profile?.voiceConfidence != null && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Voice confidence</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-24 h-2 bg-border rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-brand rounded-full"
-                            style={{ width: `${profile.voiceConfidence}%` }}
-                          />
-                        </div>
-                        <span className="font-medium text-foreground w-8">{profile.voiceConfidence}%</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <BillingSettings />
         )}
       </div>
     </div>

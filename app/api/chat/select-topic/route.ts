@@ -10,6 +10,9 @@ import { estimateEngagement, generateDraftVariants } from '@/lib/ai/generation';
 import { enqueueGeneration } from '@/lib/queue';
 import { checkUsageLimit, incrementUsage } from '@/lib/ai/usage';
 
+// Export max duration to prevent serverless timeouts during fallback AI generation
+export const maxDuration = 60;
+
 // Research topics use PerplexitySource { title, url, snippet }; accept either name or title
 const sourceSchema = z.object({
     name: z.string().optional(),
@@ -156,6 +159,10 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
 
         // Enqueue the heavy lifting
         try {
+            if (process.env.USE_BACKGROUND_WORKER !== 'true') {
+                throw new Error('SYNC_FALLBACK_REQUESTED_BY_ENV');
+            }
+
             console.log('🚀 Enqueuing generation job for conversation:', conversationId);
             await enqueueGeneration({
                 userId: user.id,

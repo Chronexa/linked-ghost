@@ -200,12 +200,12 @@ export const generatedDrafts = pgTable('generated_drafts', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
-// Subscriptions (Stripe subscription data)
+// Subscriptions (Razorpay subscription data)
 export const subscriptions = pgTable('subscriptions', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
-  stripeCustomerId: varchar('stripe_customer_id', { length: 255 }).notNull(),
-  stripeSubscriptionId: varchar('stripe_subscription_id', { length: 255 }).notNull().unique(),
+  razorpayCustomerId: varchar('razorpay_customer_id', { length: 255 }).notNull(),
+  razorpaySubscriptionId: varchar('razorpay_subscription_id', { length: 255 }).notNull().unique(),
   planType: planTypeEnum('plan_type').notNull(),
   status: subscriptionStatusEnum('status').notNull(),
   currentPeriodStart: timestamp('current_period_start').notNull(),

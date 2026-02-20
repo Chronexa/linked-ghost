@@ -16,6 +16,8 @@ import { z } from 'zod';
 import { retry, isRetryableError } from '@/lib/utils/retry';
 import { enqueueGeneration } from '@/lib/queue';
 import { checkUsageLimit, incrementUsage } from '@/lib/ai/usage';
+// Export max duration to prevent serverless timeouts during fallback AI generation
+export const maxDuration = 60;
 
 // Validation schema
 const generateSchema = z.object({
@@ -109,41 +111,99 @@ export const POST = withAuth(async (req: NextRequest, { params, user }) => {
 
     // Enqueue generation job
     const jobId = `gen-${topic.id}-${Date.now()}`;
-    await enqueueGeneration({
-      userId: user.id,
-      topicId: topic.id,
-      pillarId: effectivePillarId,
-      pillarContext: {
-        name: pillar?.name || 'General',
-        description: pillar?.description,
-        tone: pillar?.tone,
-        targetAudience: pillar?.targetAudience || profile.targetAudience,
-        customPrompt: pillar?.customPrompt,
-      },
-      topicContent: {
-        title: topic.content,
-        summary: topic.sourceUrl, // Using sourceUrl as summary/description proxy if needed, or pass full content
-      },
-      voiceExamples: examples.map((ex) => ({
-        postText: ex.postText,
-        embedding: ex.embedding,
-      })),
-      userPerspective,
-      jobId,
-    });
 
-    console.log(`✅ Enqueued draft generation job: ${jobId}`);
+    try {
+      if (process.env.USE_BACKGROUND_WORKER !== 'true') {
+        throw new Error('SYNC_FALLBACK_REQUESTED_BY_ENV');
+      }
 
-    // Increment usage (2 variants)
-    await incrementUsage(user.id, 'generate_post', 2);
+      await enqueueGeneration({
+        userId: user.id,
+        topicId: topic.id,
+        pillarId: effectivePillarId,
+        pillarContext: {
+          name: pillar?.name || 'General',
+          description: pillar?.description,
+          tone: pillar?.tone,
+          targetAudience: pillar?.targetAudience || profile.targetAudience,
+          customPrompt: pillar?.customPrompt,
+        },
+        topicContent: {
+          title: topic.content,
+          summary: topic.sourceUrl,
+        },
+        voiceExamples: examples.map((ex) => ({
+          postText: ex.postText,
+          embedding: ex.embedding,
+        })),
+        userPerspective,
+        jobId,
+      });
 
-    return responses.accepted({
-      message: 'Draft generation started in background. We will notify you when it is ready.',
-      jobId,
-      status: 'processing'
-    });
+      console.log(`✅ Enqueued draft generation job: ${jobId}`);
+      await incrementUsage(user.id, 'generate_post', 2);
+
+      return responses.accepted({
+        message: 'Draft generation started in background. We will notify you when it is ready.',
+        jobId,
+        status: 'processing'
+      });
+
+    } catch (queueError: any) {
+      console.warn(`⚠️ Queue fallback triggered in /generate: running synchronously.`);
+
+      // 1. Run Generation Direct
+      const result = await generateDraftVariants({
+        topicTitle: topic.content,
+        topicDescription: topic.sourceUrl || undefined,
+        userPerspective: userPerspective || 'Write an engaging LinkedIn post about this topic.',
+        pillarName: pillar?.name || 'General',
+        pillarDescription: pillar?.description || undefined,
+        pillarTone: pillar?.tone || undefined,
+        targetAudience: pillar?.targetAudience || profile?.targetAudience || undefined,
+        customPrompt: pillar?.customPrompt || undefined,
+        voiceExamples: examples.map((ex) => ({
+          postText: ex.postText,
+          embedding: ex.embedding as number[] | undefined,
+        })),
+        userId: user.id,
+        numVariants: 2 // Typical for this route
+      });
+
+      // 2. Save Drafts
+      const draftInserts = result.variants.map((variant) => ({
+        userId: user.id,
+        topicId: topic.id,
+        pillarId: effectivePillarId,
+        userPerspective: userPerspective || 'Write an engaging LinkedIn post about this topic.',
+        variantLetter: variant.variantLetter,
+        fullText: variant.post.fullText,
+        hook: variant.post.hook,
+        body: variant.post.body,
+        cta: variant.post.cta,
+        hashtags: variant.post.hashtags,
+        characterCount: variant.post.characterCount,
+        estimatedEngagement: estimateEngagement(variant.post),
+        status: 'draft' as const,
+      }));
+
+      const createdDrafts = await db.insert(generatedDrafts).values(draftInserts).returning();
+
+      // 3. Update Topic Status
+      await db.update(classifiedTopics)
+        .set({ status: 'drafted', updatedAt: new Date() })
+        .where(eq(classifiedTopics.id, topic.id));
+
+      await incrementUsage(user.id, 'generate_post', 2);
+
+      return responses.success({
+        message: 'Drafts generated successfully',
+        drafts: createdDrafts,
+        status: 'completed'
+      });
+    }
   } catch (error) {
-    console.error('Error queuing draft generation:', error);
-    return errors.internal('Failed to start draft generation');
+    console.error('Error in draft generation:', error);
+    return errors.internal('Failed to generate drafts');
   }
 });
