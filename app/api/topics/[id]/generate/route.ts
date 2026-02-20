@@ -191,12 +191,12 @@ export const POST = withAuth(async (req: NextRequest, { params, user }) => {
 
       // 3. Update Topic Status
       await db.update(classifiedTopics)
-        .set({ status: 'drafted' })
+        .set({ status: 'drafted', updatedAt: new Date() })
         .where(eq(classifiedTopics.id, topic.id));
 
       await incrementUsage(user.id, 'generate_post', 2);
 
-      return responses.success({
+      return responses.ok({
         message: 'Drafts generated successfully',
         drafts: createdDrafts,
         status: 'completed'

@@ -169,6 +169,7 @@ export const classifiedTopics = pgTable('classified_topics', {
   status: varchar('status', { length: 50 }).notNull().default('classified'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   classifiedAt: timestamp('classified_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
 // Generated drafts (AI-generated LinkedIn posts)
