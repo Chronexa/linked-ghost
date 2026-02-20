@@ -191,7 +191,7 @@ export const POST = withAuth(async (req: NextRequest, { params, user }) => {
 
       // 3. Update Topic Status
       await db.update(classifiedTopics)
-        .set({ status: 'drafted', updatedAt: new Date() })
+        .set({ status: 'drafted' })
         .where(eq(classifiedTopics.id, topic.id));
 
       await incrementUsage(user.id, 'generate_post', 2);
