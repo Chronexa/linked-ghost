@@ -15,7 +15,7 @@ import { generateDraftVariants, estimateEngagement } from '@/lib/ai/generation';
 import { z } from 'zod';
 import { retry, isRetryableError } from '@/lib/utils/retry';
 import { enqueueGeneration } from '@/lib/queue';
-import { checkUsageLimit, incrementUsage } from '@/lib/ai/usage';
+import { canGeneratePost, incrementUsage } from '@/lib/ai/usage';
 // Export max duration to prevent serverless timeouts during fallback AI generation
 export const maxDuration = 60;
 
@@ -39,10 +39,10 @@ export const POST = withAuth(async (req: NextRequest, { params, user }) => {
 
     const { id: topicId } = params;
 
-    // Check usage limits
-    const usageCheck = await checkUsageLimit(user.id, 'generate_post');
+    // Check post generation limit from subscription plan
+    const usageCheck = await canGeneratePost(user.id);
     if (!usageCheck.allowed) {
-      return errors.rateLimit(`Usage limit reached for your ${usageCheck.plan} plan. Please upgrade to generate more posts.`);
+      return errors.paymentRequired(usageCheck.reason || 'Post limit reached. Upgrade your plan to generate more posts.');
     }
 
     // Validate request body

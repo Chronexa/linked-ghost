@@ -8,7 +8,7 @@ import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 import { estimateEngagement, generateDraftVariants } from '@/lib/ai/generation';
 import { enqueueGeneration } from '@/lib/queue';
-import { checkUsageLimit, incrementUsage } from '@/lib/ai/usage';
+import { canGeneratePost, incrementUsage } from '@/lib/ai/usage';
 
 // Export max duration to prevent serverless timeouts during fallback AI generation
 export const maxDuration = 60;
@@ -134,10 +134,10 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
 
         const profile = await db.query.profiles.findFirst({ where: eq(profiles.userId, user.id) });
 
-        // Check usage limits before generation
-        const usageCheck = await checkUsageLimit(user.id, 'generate_post');
+        // Check post generation limit from subscription plan
+        const usageCheck = await canGeneratePost(user.id);
         if (!usageCheck.allowed) {
-            return errors.rateLimit(`Usage limit reached for your ${usageCheck.plan} plan.`);
+            return errors.paymentRequired(usageCheck.reason || 'Post limit reached. Upgrade your plan to generate more posts.');
         }
 
         // 4. Enqueue Generation Job (Async)

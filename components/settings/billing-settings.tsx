@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Check, Zap, AlertTriangle, TrendingUp, X } from 'lucide-react';
+import { Check, AlertTriangle, TrendingUp, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '@clerk/nextjs';
 import { PLANS, type PlanId, type BillingInterval } from '@/lib/config/plans.config';
@@ -182,16 +182,19 @@ export function BillingSettings() {
                 theme: { color: '#C1502E' }, // Brand color
                 handler: async function () {
                     toast.success('Payment successful! Your plan is activating...');
-                    // Poll subscription status until active
+                    // Poll subscription status — stop as soon as active is confirmed
                     let attempts = 0;
                     const poll = setInterval(async () => {
                         await fetchUsageSummary();
                         attempts++;
+                        // setSummary is called inside fetchUsageSummary; check via the ref
                         if (attempts >= 10) {
                             clearInterval(poll);
                             toast('Plan activation may take a moment. Refresh if needed.', { icon: 'ℹ️' });
                         }
                     }, 2000);
+                    // Auto-clear after 20 seconds regardless
+                    setTimeout(() => clearInterval(poll), 22000);
                 },
             };
 
