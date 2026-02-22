@@ -13,6 +13,7 @@ import { db } from '@/lib/db';
 import { pillars } from '@/lib/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { canAddPillar } from '@/lib/ai/usage';
 
 // Validation schemas
 const createPillarSchema = z.object({
@@ -84,17 +85,10 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
     const result = await validateBody(req, createPillarSchema);
     if (!result.success) return result.error;
 
-    // Check pillar limit based on subscription (TODO: implement after subscriptions)
-    const existingPillars = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(pillars)
-      .where(eq(pillars.userId, user.id));
-
-    const pillarCount = existingPillars[0]?.count || 0;
-    const maxPillars = 10; // TODO: Get from subscription
-
-    if (pillarCount >= maxPillars) {
-      return errors.subscriptionLimit('You have reached the maximum number of pillars for your plan');
+    // Check pillar limit from subscription plan
+    const pillarCheck = await canAddPillar(user.id);
+    if (!pillarCheck.allowed) {
+      return errors.paymentRequired(pillarCheck.reason || 'Pillar limit reached. Upgrade your plan to add more.');
     }
 
     const data = result.data;

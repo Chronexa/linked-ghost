@@ -97,6 +97,10 @@ export const errors = {
   subscriptionLimit: (message: string = 'Plan limit reached') =>
     error('SUBSCRIPTION_LIMIT', message, 402),
 
+  // 402 Payment Required — alias used by enforcement checks
+  paymentRequired: (message: string = 'Plan limit reached. Upgrade to continue.') =>
+    error('PAYMENT_REQUIRED', message, 402),
+
   // 500 Internal Server Error
   internal: (message: string = 'Internal server error') =>
     error('INTERNAL_ERROR', message, 500),
@@ -124,4 +128,7 @@ export const responses = {
   // Paginated list
   list: <T>(data: T[], page: number, limit: number, total: number) =>
     paginated(data, page, limit, total),
+
+  // 409 Conflict (duplicate resource)
+  conflict: <T>(data: T) => success(data, 409),
 };

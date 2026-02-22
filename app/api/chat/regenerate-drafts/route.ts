@@ -8,7 +8,7 @@ import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 import { generateDraftVariants, estimateEngagement } from '@/lib/ai/generation';
 import { retry, isRetryableError } from '@/lib/utils/retry';
-import { checkUsageLimit, incrementUsage } from '@/lib/ai/usage';
+import { canRegenerate, incrementUsage } from '@/lib/ai/usage';
 
 const regenerateSchema = z.object({
     conversationId: z.string().uuid(),
@@ -23,10 +23,10 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
 
         const { conversationId, topicId, userPerspective } = validation.data;
 
-        // Check usage limits
-        const usageCheck = await checkUsageLimit(user.id, 'regenerate_post');
-        if (!usageCheck.allowed) {
-            return errors.rateLimit(`Usage limit reached for your ${usageCheck.plan} plan.`);
+        // Check regeneration limit from subscription plan
+        const regenCheck = await canRegenerate(user.id);
+        if (!regenCheck.allowed) {
+            return errors.paymentRequired(regenCheck.reason || `Regeneration limit reached. Upgrade your plan for unlimited regenerations.`);
         }
 
         // Verify conversation

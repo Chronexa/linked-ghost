@@ -2,17 +2,15 @@ import { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/api/with-auth';
 import { responses, errors } from '@/lib/api/response';
 import { db } from '@/lib/db';
-import { subscriptions, planTypeEnum } from '@/lib/db/schema';
+import { subscriptions } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { razorpay } from '@/lib/payments/razorpay';
-import { RAZORPAY_PLANS } from '@/lib/payments/plans';
-
-// Type extraction from zod enum for runtime matching
-type PlanType = typeof planTypeEnum.enumValues[number];
+import { getPlanConfig, type PlanId, type BillingInterval } from '@/lib/config/plans.config';
 
 const createSubscriptionSchema = z.object({
-    planType: z.enum(planTypeEnum.enumValues),
+    planId: z.enum(['starter', 'growth']),
+    billingInterval: z.enum(['monthly', 'yearly']),
 });
 
 export const POST = withAuth(async (req: NextRequest, { user }) => {
@@ -20,67 +18,75 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
         const body = await req.json();
         const validation = createSubscriptionSchema.safeParse(body);
         if (!validation.success) {
-            return errors.badRequest('Invalid plan type provided.');
+            return errors.badRequest('Invalid plan or billing interval. Must be starter|growth and monthly|yearly.');
         }
 
-        const { planType } = validation.data;
-        const razorpayPlanId = RAZORPAY_PLANS[planType as PlanType];
+        const { planId, billingInterval } = validation.data as { planId: PlanId; billingInterval: BillingInterval };
+        const planConfig = getPlanConfig(planId);
+        const razorpayPlanId = planConfig.razorpayPlanIds[billingInterval];
 
         if (!razorpayPlanId) {
-            return errors.badRequest('Selected plan is not currently available.');
+            return errors.badRequest('Selected plan configuration is not yet available. Please contact support.');
         }
 
-        // 1. Check if user already has an active subscription
-        let existingSub = await db.query.subscriptions.findFirst({
-            where: eq(subscriptions.userId, user.id)
+        // 1. Idempotency — reject if user already has an active or trialing subscription
+        const existingSub = await db.query.subscriptions.findFirst({
+            where: eq(subscriptions.userId, user.id),
         });
 
-        if (existingSub && existingSub.status === 'active' && existingSub.planType === planType) {
-            return errors.badRequest('You are already subscribed to this plan.');
+        if (existingSub && (existingSub.status === 'active' || existingSub.status === 'trialing')) {
+            return responses.conflict({
+                error: `You already have an active ${existingSub.planType} subscription. Please cancel it before switching plans.`,
+                currentPlan: existingSub.planType,
+                currentStatus: existingSub.status,
+            });
         }
 
-        // 2. Ensure Razorpay Customer Exists
-        let customerId = existingSub?.razorpayCustomerId;
+        // 2. Ensure Razorpay customer exists — save to DB immediately before subscription
+        let customerId = existingSub?.razorpayCustomerId ?? null;
 
         if (!customerId) {
-            // Create a new Razorpay customer
-            const customerParams = {
-                name: user.fullName || undefined,
+            console.log(`[create-subscription] Creating Razorpay customer for user ${user.id}`);
+            const customer = await razorpay.customers.create({
+                name: user.fullName || 'ContentPilot User',
                 email: user.email,
-                contact: undefined,
-                notes: {
-                    userId: user.id
-                }
-            };
-
-            const customer = await razorpay.customers.create(customerParams);
+                notes: { userId: user.id },
+            });
             customerId = customer.id;
+            console.log(`[create-subscription] Created customer: ${customerId}`);
         }
 
-        // 3. Create Subscription in Razorpay
-        const subscriptionParams = {
+        // 3. Create Razorpay subscription
+        const totalCount = billingInterval === 'yearly' ? 1 : 12; // yearly = 1 annual charge
+        const rzpSubscription = await razorpay.subscriptions.create({
             plan_id: razorpayPlanId,
-            customer_id: customerId,
-            total_count: 120, // max billing cycles (e.g. 10 years for monthly)
+            customer_notify: 1,
+            quantity: 1,
+            total_count: totalCount,
+            expire_by: Math.floor(Date.now() / 1000) + 30 * 60, // 30-min checkout expiry
             notes: {
                 userId: user.id,
-                planType: planType,
-            }
-        };
+                planId,
+                billingInterval,
+            },
+        });
 
-        const rzpSubscription = await razorpay.subscriptions.create(subscriptionParams);
+        console.log(`[create-subscription] Created Razorpay subscription: ${rzpSubscription.id}`);
 
-        // 4. Update or Insert pending subscription record in DB
+        // 4. Save pending subscription to DB
+        const now = new Date();
         const dbData = {
             userId: user.id,
-            razorpayCustomerId: customerId as string,
+            razorpayCustomerId: customerId,
             razorpaySubscriptionId: rzpSubscription.id,
-            planType: planType as PlanType,
-            status: 'trialing' as const, // will be updated to 'active' by webhook
-            currentPeriodStart: new Date(rzpSubscription.current_start ? rzpSubscription.current_start * 1000 : Date.now()),
-            currentPeriodEnd: new Date(rzpSubscription.current_end ? rzpSubscription.current_end * 1000 : Date.now() + 30 * 24 * 60 * 60 * 1000),
+            razorpayPlanId: razorpayPlanId,
+            billingInterval: billingInterval,
+            planType: planId,
+            status: 'trialing' as const,
+            currentPeriodStart: now,
+            currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), // placeholder — webhook will overwrite
             cancelAtPeriodEnd: false,
-            updatedAt: new Date()
+            updatedAt: now,
         };
 
         if (existingSub) {
@@ -91,14 +97,15 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
             await db.insert(subscriptions).values(dbData);
         }
 
-        // Return the subscription ID to the frontend to launch checkout
+        // 5. Return subscription ID + public key for frontend checkout modal
         return responses.ok({
             subscriptionId: rzpSubscription.id,
-            customerId: customerId,
+            keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? '',
         });
 
     } catch (error: any) {
-        console.error('Error creating Razorpay subscription:', error);
-        return errors.internal(error.message || 'Failed to initialize subscription check-out.');
+        console.error('[create-subscription] Error:', error);
+        // Never expose raw Razorpay errors to client
+        return errors.internal('Failed to initialize subscription checkout. Please try again or contact support.');
     }
 });

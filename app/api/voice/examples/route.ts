@@ -13,6 +13,7 @@ import { db } from '@/lib/db';
 import { voiceExamples, pillars } from '@/lib/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { canAddVoiceExample } from '@/lib/ai/usage';
 
 // Validation schema – aligned with frontend (minimum 50 characters)
 const createVoiceExampleSchema = z.object({
@@ -93,6 +94,12 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
     if (!result.success) return result.error;
 
     const data = result.data;
+
+    // Check voice example limit from subscription plan
+    const voiceCheck = await canAddVoiceExample(user.id);
+    if (!voiceCheck.allowed) {
+      return errors.paymentRequired(voiceCheck.reason || 'Voice example limit reached. Upgrade your plan to add more.');
+    }
 
     // If pillarId provided, verify it belongs to user
     if (data.pillarId) {

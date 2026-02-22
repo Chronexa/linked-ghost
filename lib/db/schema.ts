@@ -11,8 +11,8 @@ export const topicSourceEnum = pgEnum('topic_source', ['perplexity', 'reddit', '
 export const topicStatusEnum = pgEnum('topic_status', ['new', 'classified', 'archived']);
 export const hookAngleEnum = pgEnum('hook_angle', ['emotional', 'analytical', 'storytelling', 'contrarian', 'data_driven']);
 export const draftStatusEnum = pgEnum('draft_status', ['draft', 'approved', 'scheduled', 'posted', 'rejected']);
-export const planTypeEnum = pgEnum('plan_type', ['starter', 'growth', 'agency']);
-export const subscriptionStatusEnum = pgEnum('subscription_status', ['active', 'canceled', 'past_due', 'trialing']);
+export const planTypeEnum = pgEnum('plan_type', ['starter', 'growth']);
+export const subscriptionStatusEnum = pgEnum('subscription_status', ['active', 'canceled', 'past_due', 'trialing', 'paused', 'halted']);
 export const messageRoleEnum = pgEnum('message_role', ['user', 'assistant']);
 export const messageTypeEnum = pgEnum('message_type', ['text', 'research_request', 'topic_cards', 'perspective_request', 'draft_variants', 'action_prompt']);
 
@@ -207,6 +207,8 @@ export const subscriptions = pgTable('subscriptions', {
   userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
   razorpayCustomerId: varchar('razorpay_customer_id', { length: 255 }).notNull(),
   razorpaySubscriptionId: varchar('razorpay_subscription_id', { length: 255 }).notNull().unique(),
+  razorpayPlanId: varchar('razorpay_plan_id', { length: 255 }),          // which Razorpay plan_id was used
+  billingInterval: varchar('billing_interval', { length: 10 }),            // 'monthly' | 'yearly'
   planType: planTypeEnum('plan_type').notNull(),
   status: subscriptionStatusEnum('status').notNull(),
   currentPeriodStart: timestamp('current_period_start').notNull(),
