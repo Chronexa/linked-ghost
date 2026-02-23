@@ -1,14 +1,25 @@
 'use client';
 
 import { useState } from 'react';
+import { useUser } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
 import { PLANS, type BillingInterval } from '@/lib/config/plans.config';
 import { BillingToggle } from '@/components/pricing/billing-toggle';
 import { PlanCard } from '@/components/pricing/plan-card';
 import { PricingFAQ } from '@/components/pricing/pricing-faq';
-import Link from 'next/link';
 
 export default function PricingPage() {
     const [billing, setBilling] = useState<BillingInterval>('yearly');
+    const { isSignedIn } = useUser();
+    const router = useRouter();
+
+    const handleBottomCTA = () => {
+        if (isSignedIn) {
+            router.push('/settings/billing?plan=growth&billing=yearly');
+        } else {
+            router.push('/sign-up');
+        }
+    };
 
     return (
         <div className="bg-[#FFFCF2] min-h-screen pb-24">
@@ -34,33 +45,19 @@ export default function PricingPage() {
 
             {/* SECTION 4 — Social Proof / Trust Strip */}
             <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8 py-6 px-6 text-sm text-[#52525B] max-w-4xl mx-auto mb-8">
-                <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-[#6B8E23]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span>7-day free trial</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-[#6B8E23]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span>No credit card required</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-[#6B8E23]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span>Cancel anytime</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-[#6B8E23]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span>Used by 50+ LinkedIn creators</span>
-                </div>
+                {[
+                    '7-day free trial',
+                    'No credit card required',
+                    'Cancel anytime',
+                    'Used by 50+ LinkedIn creators',
+                ].map((item) => (
+                    <div key={item} className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-[#6B8E23]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>{item}</span>
+                    </div>
+                ))}
             </div>
 
             {/* SECTION 3 — Plan Cards */}
@@ -86,12 +83,15 @@ export default function PricingPage() {
                         Stop staring at a blank page.
                     </h2>
                     <p className="text-[#9CA3AF] text-base mb-8 max-w-md mx-auto">
-                        Join 50+ LinkedIn creators who generate their week's content
+                        Join 50+ LinkedIn creators who generate their week&apos;s content
                         in under 15 minutes.
                     </p>
-                    <Link href="/sign-up" className="inline-flex items-center h-12 px-8 rounded-lg bg-[#C1502E] text-white font-semibold text-sm hover:bg-[#E07A5F] transition-all shadow-md">
-                        Start Your Free Trial →
-                    </Link>
+                    <button
+                        onClick={handleBottomCTA}
+                        className="inline-flex items-center h-12 px-8 rounded-lg bg-[#C1502E] text-white font-semibold text-sm hover:bg-[#E07A5F] transition-all shadow-md"
+                    >
+                        {isSignedIn ? 'Go to Billing →' : 'Start Your Free Trial →'}
+                    </button>
                     <p className="text-xs text-[#6B7280] mt-4">
                         7 days free · No credit card · Cancel anytime
                     </p>

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -115,6 +116,8 @@ export function BillingSettings() {
     const [isLoading, setIsLoading] = useState<string | null>(null);
     const [summary, setSummary] = useState<UsageSummary | null>(null);
     const { getToken } = useAuth();
+    const searchParams = useSearchParams();
+    const autoCheckoutTriggered = useRef(false);
 
     const fetchUsageSummary = useCallback(async () => {
         try {
@@ -132,6 +135,22 @@ export function BillingSettings() {
     }, [getToken]);
 
     useEffect(() => { fetchUsageSummary(); }, [fetchUsageSummary]);
+
+    // Auto-trigger checkout if arriving from /pricing with ?plan=...&billing=...
+    useEffect(() => {
+        if (autoCheckoutTriggered.current) return;
+        const planParam = searchParams.get('plan') as PlanId | null;
+        const billingParam = searchParams.get('billing') as BillingInterval | null;
+        if (planParam && (planParam === 'starter' || planParam === 'growth')) {
+            if (billingParam === 'monthly' || billingParam === 'yearly') {
+                setBillingInterval(billingParam);
+            }
+            autoCheckoutTriggered.current = true;
+            // Small delay to let the page render first
+            setTimeout(() => handleSubscribe(planParam), 800);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
 
     const activePlanId = summary?.planId as PlanId | 'free_trial' | undefined;
     const subStatus = summary?.status;
