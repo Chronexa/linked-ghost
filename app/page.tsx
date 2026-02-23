@@ -20,7 +20,7 @@ export default function Home() {
               <Link href="#features" className="text-charcoal-light hover:text-charcoal transition font-medium">
                 Features
               </Link>
-              <Link href="#pricing" className="text-charcoal-light hover:text-charcoal transition font-medium">
+              <Link href="/pricing" className="text-charcoal-light hover:text-charcoal transition font-medium">
                 Pricing
               </Link>
               <Link href="/dashboard">
@@ -41,18 +41,18 @@ export default function Home() {
               ✨ AI-Powered LinkedIn Content in Your Voice
             </span>
           </div>
-          
+
           <h1 className="font-display text-5xl md:text-7xl font-bold text-charcoal mb-6 leading-[1.1] tracking-tight">
             Your LinkedIn Ghostwriter<br />
             <span className="text-brand">
               That Sounds Like You
             </span>
           </h1>
-          
+
           <p className="text-xl md:text-2xl text-charcoal-light mb-10 max-w-3xl mx-auto leading-relaxed">
             Transform industry news, insights, and data into engaging LinkedIn posts in under 3 minutes
           </p>
-          
+
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Link href="/onboarding">
               <Button size="lg" className="px-8 text-lg">
@@ -150,99 +150,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="container mx-auto px-6 py-16 md:py-24 bg-background">
-        <div className="text-center mb-12">
-          <h2 className="font-display text-3xl md:text-4xl font-bold text-charcoal mb-4">
-            Simple, Transparent Pricing
-          </h2>
-          <p className="text-lg text-charcoal-light">
-            Start free, upgrade as you grow
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-          {[
-            {
-              name: 'Starter',
-              price: '$29',
-              posts: '10 posts',
-              pillars: '2 pillars',
-              features: ['Multi-source research', 'Voice cloning', 'Basic analytics'],
-            },
-            {
-              name: 'Growth',
-              price: '$79',
-              posts: '30 posts',
-              pillars: '5 pillars',
-              features: ['Everything in Starter', 'Priority support', 'Advanced analytics', 'Custom scheduling'],
-              featured: true,
-            },
-            {
-              name: 'Agency',
-              price: '$199',
-              posts: 'Unlimited',
-              pillars: '10 pillars',
-              features: ['Everything in Growth', 'Team collaboration', 'White-label options', 'Dedicated support'],
-            },
-          ].map((plan, i) => (
-            <div
-              key={i}
-              className={`rounded-xl p-8 ${
-                plan.featured
-                  ? 'bg-brand text-white shadow-warm scale-105'
-                  : 'bg-surface border border-border'
-              }`}
-            >
-              <h3 className={`font-display text-2xl font-bold mb-2 ${plan.featured ? 'text-white' : 'text-charcoal'}`}>
-                {plan.name}
-              </h3>
-              <div className="mb-4">
-                <span className={`text-5xl font-bold ${plan.featured ? 'text-white' : 'text-charcoal'}`}>
-                  {plan.price}
-                </span>
-                <span className={`text-lg ${plan.featured ? 'text-white/80' : 'text-charcoal-light'}`}>
-                  /month
-                </span>
-              </div>
-              <div className={`text-sm mb-6 ${plan.featured ? 'text-white/90' : 'text-charcoal-light'}`}>
-                <div>{plan.posts} per month</div>
-                <div>{plan.pillars}</div>
-              </div>
-              <ul className="space-y-3 mb-8">
-                {plan.features.map((feature, j) => (
-                  <li key={j} className="flex items-start">
-                    <svg
-                      className={`w-5 h-5 mr-2 mt-0.5 flex-shrink-0 ${
-                        plan.featured ? 'text-white' : 'text-success'
-                      }`}
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <span className={plan.featured ? 'text-white/90' : 'text-charcoal-light'}>
-                      {feature}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <Link href="/onboarding">
-                <Button
-                  variant={plan.featured ? 'secondary' : 'primary'}
-                  className="w-full"
-                >
-                  Get Started
-                </Button>
-              </Link>
-            </div>
-          ))}
-        </div>
-      </section>
 
       {/* Footer */}
       <footer className="border-t border-border bg-surface">
@@ -254,7 +161,7 @@ export default function Home() {
               </div>
               <span className="font-display font-semibold text-charcoal">ContentPilot AI</span>
             </div>
-            
+
             <div className="flex items-center space-x-6">
               <a
                 href="https://www.producthunt.com"
@@ -274,7 +181,7 @@ export default function Home() {
               </a>
             </div>
           </div>
-          
+
           <div className="mt-8 pt-8 border-t border-border text-center text-sm text-charcoal-light">
             © 2026 ContentPilot AI. All rights reserved.
           </div>
