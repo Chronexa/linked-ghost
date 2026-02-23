@@ -5,10 +5,14 @@ import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Check, AlertTriangle, TrendingUp, X } from 'lucide-react';
+import {
+    Check, AlertTriangle, TrendingUp, X, History,
+    CreditCard, Zap, ChevronDown, ChevronUp, Loader2
+} from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { useAuth } from '@clerk/nextjs';
+import { useAuth, useUser } from '@clerk/nextjs';
 import { PLANS, type PlanId, type BillingInterval } from '@/lib/config/plans.config';
+import { format } from 'date-fns';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,18 +40,26 @@ interface UsageSummary {
         voiceExamples: number;
     };
     trialEnd?: string | null;
+    currentPeriodEnd?: string | null;
+    cancelAtPeriodEnd?: boolean;
+    billingInterval?: string | null;
+}
+
+interface PaymentRecord {
+    id: string;
+    amount: number;
+    currency: string;
+    status: string;
+    method: string;
+    createdAt: string;
+    description: string | null;
 }
 
 // ---------------------------------------------------------------------------
-// Usage Bar component
+// UsageBar
 // ---------------------------------------------------------------------------
 
-function UsageBar({
-    label,
-    current,
-    limit,
-    percentage,
-}: {
+function UsageBar({ label, current, limit, percentage }: {
     label: string;
     current: number;
     limit: number | null;
@@ -82,15 +94,11 @@ function UsageBar({
 
 function TrialBanner({ trialEnd }: { trialEnd: string | null | undefined }) {
     const [dismissed, setDismissed] = useState(false);
-
     if (!trialEnd || dismissed) return null;
-
     const daysLeft = Math.max(0, Math.ceil(
         (new Date(trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
     ));
-
     if (daysLeft <= 0) return null;
-
     return (
         <div className="flex items-center justify-between gap-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
             <div className="flex items-center gap-2">
@@ -108,14 +116,95 @@ function TrialBanner({ trialEnd }: { trialEnd: string | null | undefined }) {
 }
 
 // ---------------------------------------------------------------------------
+// Cancellation confirm dialog
+// ---------------------------------------------------------------------------
+
+function CancelDialog({ onConfirm, onClose, periodEnd }: {
+    onConfirm: () => void;
+    onClose: () => void;
+    periodEnd: string | null | undefined;
+}) {
+    const formatted = periodEnd ? format(new Date(periodEnd), 'MMMM d, yyyy') : 'end of billing period';
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border bg-background p-6 shadow-2xl">
+                <h3 className="text-lg font-bold mb-2">Cancel Subscription?</h3>
+                <p className="text-sm text-muted-foreground mb-5">
+                    You will retain full access until <strong>{formatted}</strong>. After that, you'll move to the free tier (3 posts/month). This cannot be undone.
+                </p>
+                <div className="flex gap-3 justify-end">
+                    <Button variant="outline" onClick={onClose}>Keep Subscription</Button>
+                    <Button
+                        variant="outline"
+                        className="border-destructive text-destructive hover:bg-destructive hover:text-white"
+                        onClick={() => { onConfirm(); onClose(); }}
+                    >
+                        Yes, Cancel
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Post-payment success state
+// ---------------------------------------------------------------------------
+
+function PaymentSuccessBanner({ planName, onDismiss }: { planName: string; onDismiss: () => void }) {
+    return (
+        <div className="flex items-start justify-between gap-4 rounded-xl border border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/30 px-5 py-4">
+            <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                    <Check className="h-5 w-5" />
+                </div>
+                <div>
+                    <p className="font-semibold text-emerald-800 dark:text-emerald-300">
+                        Payment successful! Activating {planName} plan…
+                    </p>
+                    <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
+                        Your plan will be active within 30 seconds. Refresh the page if limits don't update.
+                    </p>
+                </div>
+            </div>
+            <button onClick={onDismiss} className="shrink-0 opacity-60 hover:opacity-100 mt-0.5">
+                <X className="h-4 w-4" />
+            </button>
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Checkout loading overlay
+// ---------------------------------------------------------------------------
+
+function CheckoutLoading() {
+    return (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-muted/60 backdrop-blur-sm py-8 text-sm text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin text-brand" />
+            <span>Preparing your checkout…</span>
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Main BillingSettings
 // ---------------------------------------------------------------------------
 
 export function BillingSettings() {
     const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly');
-    const [isLoading, setIsLoading] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState<string | null>(null);       // planId being loaded
+    const [isCancelling, setIsCancelling] = useState(false);
+    const [showCancelDialog, setShowCancelDialog] = useState(false);
+    const [showSuccess, setShowSuccess] = useState<string | null>(null);   // plan name after payment
+    const [checkoutLoading, setCheckoutLoading] = useState(false);
+    const [history, setHistory] = useState<PaymentRecord[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [showHistory, setShowHistory] = useState(false);
     const [summary, setSummary] = useState<UsageSummary | null>(null);
+
     const { getToken } = useAuth();
+    const { user: clerkUser } = useUser();
     const searchParams = useSearchParams();
     const autoCheckoutTriggered = useRef(false);
 
@@ -129,9 +218,7 @@ export function BillingSettings() {
                 const json = await res.json();
                 setSummary(json.data ?? null);
             }
-        } catch {
-            // Non-blocking — page still works without this
-        }
+        } catch { /* non-blocking */ }
     }, [getToken]);
 
     useEffect(() => { fetchUsageSummary(); }, [fetchUsageSummary]);
@@ -146,31 +233,39 @@ export function BillingSettings() {
                 setBillingInterval(billingParam);
             }
             autoCheckoutTriggered.current = true;
-            // Small delay to let the page render first
-            setTimeout(() => handleSubscribe(planParam), 800);
+            setCheckoutLoading(true);
+            setTimeout(() => {
+                setCheckoutLoading(false);
+                handleSubscribe(planParam);
+            }, 800);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
 
-    const activePlanId = summary?.planId as PlanId | 'free_trial' | undefined;
-    const subStatus = summary?.status;
+    const loadRazorpayScript = () => new Promise<void>((resolve, reject) => {
+        if ((window as any).Razorpay) { resolve(); return; }
+        const s = document.createElement('script');
+        s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        s.onload = () => resolve();
+        s.onerror = reject;
+        document.body.appendChild(s);
+    });
 
     const handleSubscribe = async (planId: PlanId) => {
         setIsLoading(planId);
         try {
-            // Dynamically load Razorpay checkout script
-            if (!(window as any).Razorpay) {
-                await new Promise<void>((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-                    script.onload = () => resolve();
-                    script.onerror = reject;
-                    document.body.appendChild(script);
-                });
-            }
+            await loadRazorpayScript();
 
             const token = await getToken();
-            const response = await fetch('/api/billing/create-subscription', {
+            const activePlanId = summary?.planId as PlanId | 'free_trial' | undefined;
+            const hasActiveSub = summary?.status === 'active' || summary?.status === 'trialing';
+
+            // Decide endpoint: upgrade if switching plans, create if new
+            const endpoint = hasActiveSub && activePlanId && activePlanId !== 'free_trial' && activePlanId !== planId
+                ? '/api/billing/upgrade-subscription'
+                : '/api/billing/create-subscription';
+
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ planId, billingInterval }),
@@ -189,38 +284,43 @@ export function BillingSettings() {
 
             const planConfig = PLANS[planId];
             const displayName = `${planConfig.name} — ${billingInterval === 'yearly' ? 'Annual' : 'Monthly'}`;
-            const priceUsd = billingInterval === 'yearly' ? planConfig.yearlyPriceUsd : planConfig.monthlyPriceUsd;
 
             const options = {
                 key: data.data.keyId,
                 subscription_id: data.data.subscriptionId,
                 name: 'ContentPilot AI',
                 description: displayName,
-                prefill: {}, // Clerk handles user identity
+                // Pre-fill with Clerk user data — reduces friction
+                prefill: {
+                    name: clerkUser?.fullName ?? '',
+                    email: clerkUser?.primaryEmailAddress?.emailAddress ?? '',
+                    contact: clerkUser?.primaryPhoneNumber?.phoneNumber ?? '',
+                },
                 notes: { planId, billingInterval },
-                theme: { color: '#C1502E' }, // Brand color
-                handler: async function () {
-                    toast.success('Payment successful! Your plan is activating...');
-                    // Poll subscription status — stop as soon as active is confirmed
+                theme: { color: '#C1502E' },
+                modal: {
+                    ondismiss: () => {
+                        toast('Checkout cancelled. Your plan was not changed.', { icon: 'ℹ️' });
+                    },
+                },
+                handler: async () => {
+                    setShowSuccess(planConfig.name);
+                    // Poll until webhook confirms status change (max 30 seconds)
                     let attempts = 0;
                     const poll = setInterval(async () => {
                         await fetchUsageSummary();
                         attempts++;
-                        // setSummary is called inside fetchUsageSummary; check via the ref
-                        if (attempts >= 10) {
+                        if (attempts >= 15) {
                             clearInterval(poll);
-                            toast('Plan activation may take a moment. Refresh if needed.', { icon: 'ℹ️' });
                         }
                     }, 2000);
-                    // Auto-clear after 20 seconds regardless
-                    setTimeout(() => clearInterval(poll), 22000);
+                    setTimeout(() => clearInterval(poll), 32000);
                 },
             };
 
             const rzp = new (window as any).Razorpay(options);
-            rzp.on('payment.failed', function (response: any) {
-                console.error('Payment Failed', response.error);
-                toast.error(`Payment failed: ${response.error.description}`);
+            rzp.on('payment.failed', (resp: any) => {
+                toast.error(`Payment failed: ${resp.error.description}`);
             });
             rzp.open();
 
@@ -231,28 +331,140 @@ export function BillingSettings() {
         }
     };
 
+    const handleCancel = async () => {
+        setIsCancelling(true);
+        try {
+            const token = await getToken();
+            const res = await fetch('/api/billing/cancel-subscription', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (res.ok) {
+                toast.success('Subscription cancelled. Access continues until ' +
+                    (summary?.currentPeriodEnd
+                        ? format(new Date(summary.currentPeriodEnd), 'MMM d, yyyy')
+                        : 'end of billing period'));
+                await fetchUsageSummary();
+            } else {
+                toast.error(data.error?.message || 'Failed to cancel. Please contact support.');
+            }
+        } catch {
+            toast.error('Failed to cancel. Please try again.');
+        } finally {
+            setIsCancelling(false);
+        }
+    };
+
+    const fetchHistory = async () => {
+        if (history.length > 0) { setShowHistory(v => !v); return; }
+        setHistoryLoading(true);
+        setShowHistory(true);
+        try {
+            const token = await getToken();
+            const res = await fetch('/api/billing/history', {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setHistory(data.data?.payments ?? []);
+            }
+        } catch { /* non-blocking */ }
+        finally { setHistoryLoading(false); }
+    };
+
+    const activePlanId = summary?.planId as PlanId | 'free_trial' | undefined;
+    const subStatus = summary?.status ?? null;
+    const hasActiveSub = subStatus === 'active' || subStatus === 'trialing';
+    const isCancelledAtEnd = summary?.cancelAtPeriodEnd ?? false;
+
+    const statusLabel: Record<string, { label: string; color: string }> = {
+        active: { label: 'Active', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
+        trialing: { label: 'Free Trial', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+        past_due: { label: 'Past Due', color: 'bg-amber-100 text-amber-700' },
+        halted: { label: 'Halted', color: 'bg-red-100 text-red-700' },
+        canceled: { label: 'Cancelled', color: 'bg-gray-100 text-gray-600' },
+        paused: { label: 'Paused', color: 'bg-gray-100 text-gray-600' },
+    };
+
     return (
         <div className="space-y-6">
+            {/* Cancel confirm dialog */}
+            {showCancelDialog && (
+                <CancelDialog
+                    periodEnd={summary?.currentPeriodEnd}
+                    onConfirm={handleCancel}
+                    onClose={() => setShowCancelDialog(false)}
+                />
+            )}
+
             {/* Trial banner */}
             {subStatus === 'trialing' && summary && (
                 <TrialBanner trialEnd={(summary as any).trialEnd} />
             )}
 
+            {/* Payment success banner */}
+            {showSuccess && (
+                <PaymentSuccessBanner
+                    planName={showSuccess}
+                    onDismiss={() => setShowSuccess(null)}
+                />
+            )}
+
+            {/* Current plan status bar */}
+            {summary && hasActiveSub && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/40 px-4 py-3">
+                    <div className="flex items-center gap-3">
+                        <CreditCard className="h-4 w-4 text-muted-foreground" />
+                        <div className="text-sm">
+                            <span className="font-semibold capitalize">{activePlanId !== 'free_trial' ? PLANS[activePlanId as PlanId]?.name : 'Free Trial'} Plan</span>
+                            {summary.billingInterval && (
+                                <span className="ml-1.5 text-muted-foreground">
+                                    ({summary.billingInterval === 'yearly' ? 'Annual' : 'Monthly'})
+                                </span>
+                            )}
+                        </div>
+                        {subStatus && statusLabel[subStatus] && (
+                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusLabel[subStatus].color}`}>
+                                {isCancelledAtEnd ? 'Cancels ' + format(new Date(summary.currentPeriodEnd!), 'MMM d') : statusLabel[subStatus].label}
+                            </span>
+                        )}
+                    </div>
+                    {/* Cancel / reactivate */}
+                    {!isCancelledAtEnd && (
+                        <button
+                            onClick={() => setShowCancelDialog(true)}
+                            disabled={isCancelling}
+                            className="text-xs text-muted-foreground underline-offset-2 hover:underline hover:text-destructive transition-colors"
+                        >
+                            {isCancelling ? 'Cancelling…' : 'Cancel subscription'}
+                        </button>
+                    )}
+                    {isCancelledAtEnd && summary.currentPeriodEnd && (
+                        <span className="text-xs text-muted-foreground">
+                            Access until {format(new Date(summary.currentPeriodEnd), 'MMM d, yyyy')}
+                        </span>
+                    )}
+                </div>
+            )}
+
             {/* Billing interval toggle */}
             <div className="flex items-center justify-center gap-3">
-                <span className={`text-sm font-medium ${billingInterval === 'monthly' ? '' : 'text-muted-foreground'}`}>
+                <span className={`text-sm font-medium ${billingInterval === 'monthly' ? 'text-foreground' : 'text-muted-foreground'}`}>
                     Monthly
                 </span>
                 <button
-                    onClick={() => setBillingInterval(prev => prev === 'monthly' ? 'yearly' : 'monthly')}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none
-                        ${billingInterval === 'yearly' ? 'bg-brand' : 'bg-muted'}`}
+                    role="switch"
+                    aria-checked={billingInterval === 'yearly'}
                     aria-label="Toggle billing interval"
+                    onClick={() => setBillingInterval(prev => prev === 'monthly' ? 'yearly' : 'monthly')}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2
+                        ${billingInterval === 'yearly' ? 'bg-brand' : 'bg-muted'}`}
                 >
                     <span className={`inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform
                         ${billingInterval === 'yearly' ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
-                <span className={`text-sm font-medium ${billingInterval === 'yearly' ? '' : 'text-muted-foreground'}`}>
+                <span className={`text-sm font-medium ${billingInterval === 'yearly' ? 'text-foreground' : 'text-muted-foreground'}`}>
                     Yearly
                     <span className="ml-1.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                         Save 20%
@@ -260,91 +472,105 @@ export function BillingSettings() {
                 </span>
             </div>
 
+            {/* Checkout loading */}
+            {checkoutLoading && <CheckoutLoading />}
+
             {/* Plan cards */}
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {(Object.values(PLANS) as typeof PLANS[PlanId][]).map((plan) => {
-                    const isActive = activePlanId === plan.id;
-                    const price = billingInterval === 'yearly'
-                        ? plan.yearlyMonthlyEquivalent
-                        : plan.monthlyPriceUsd;
-                    const originalPrice = plan.monthlyPriceUsd;
+            {!checkoutLoading && (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    {(Object.values(PLANS) as typeof PLANS[PlanId][]).map((plan) => {
+                        const isActive = activePlanId === plan.id && hasActiveSub;
+                        const isDowngrade = hasActiveSub && activePlanId === 'growth' && plan.id === 'starter';
+                        const price = billingInterval === 'yearly' ? plan.yearlyMonthlyEquivalent : plan.monthlyPriceUsd;
+                        const originalPrice = plan.monthlyPriceUsd;
+                        // INR equivalent shown for transparency
+                        const inrMonthly = plan.id === 'starter' ? 1728 : 4456;
+                        const inrYearly = plan.id === 'starter' ? 16368 : 42556;
+                        const inrDisplay = billingInterval === 'yearly' ? inrYearly : inrMonthly;
 
-                    return (
-                        <div
-                            key={plan.id}
-                            className={`relative flex flex-col rounded-2xl border p-6 transition-shadow
-                                ${isActive ? 'border-brand shadow-md' : 'border-border'}`}
-                        >
-                            {/* Badges */}
-                            <div className="absolute -top-3 left-1/2 flex -translate-x-1/2 gap-2">
-                                {isActive && (
-                                    <Badge className="bg-brand text-white">Current Plan</Badge>
-                                )}
-                                {plan.badge && !isActive && (
-                                    <Badge variant="outline" className="border-brand text-brand">
-                                        {plan.badge}
-                                    </Badge>
-                                )}
-                            </div>
+                        let ctaLabel = 'Start 7-Day Trial';
+                        if (isActive) ctaLabel = 'Current Plan';
+                        else if (isDowngrade) ctaLabel = 'Downgrade';
+                        else if (hasActiveSub) ctaLabel = 'Upgrade';
+                        else if (isLoading === plan.id) ctaLabel = 'Opening checkout…';
 
-                            {/* Plan name */}
-                            <div className="mb-4">
-                                <h3 className="text-xl font-bold">{plan.name}</h3>
-                                <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
-                            </div>
-
-                            {/* Price */}
-                            <div className="mb-6 flex items-baseline gap-1">
-                                <span className="text-4xl font-bold">${price}</span>
-                                <span className="text-sm text-muted-foreground">/mo</span>
-                                {billingInterval === 'yearly' && price < originalPrice && (
-                                    <span className="ml-2 text-sm text-muted-foreground line-through">
-                                        ${originalPrice}
-                                    </span>
-                                )}
-                            </div>
-
-                            {billingInterval === 'yearly' && (
-                                <p className="mb-4 -mt-3 text-xs text-muted-foreground">
-                                    Billed ${plan.yearlyPriceUsd}/year
-                                </p>
-                            )}
-
-                            {/* Feature list */}
-                            <ul className="mb-6 flex-1 space-y-2.5">
-                                {[
-                                    `${plan.limits.postsPerMonth ?? '∞'} posts / month`,
-                                    `${plan.limits.pillars ?? '∞'} content pillars`,
-                                    `${plan.limits.voiceExamples ?? '∞'} voice examples`,
-                                    plan.limits.regenerationsPerMonth === null
-                                        ? 'Unlimited regenerations'
-                                        : `${plan.limits.regenerationsPerMonth} regenerations / month`,
-                                    plan.features.prioritySupport ? 'Priority support' : 'Email support',
-                                ].map((feat, i) => (
-                                    <li key={i} className="flex items-center gap-2.5 text-sm">
-                                        <Check className="h-4 w-4 shrink-0 text-brand" />
-                                        {feat}
-                                    </li>
-                                ))}
-                            </ul>
-
-                            {/* CTA */}
-                            <Button
-                                className="mt-auto w-full"
-                                variant={isActive ? 'outline' : 'primary'}
-                                disabled={isActive || isLoading !== null}
-                                onClick={() => handleSubscribe(plan.id)}
+                        return (
+                            <div
+                                key={plan.id}
+                                className={`relative flex flex-col rounded-2xl border p-6 transition-shadow
+                                    ${isActive ? 'border-brand shadow-[0_0_0_2px] shadow-brand/20' : 'border-border hover:shadow-md'}`}
                             >
-                                {isLoading === plan.id
-                                    ? 'Opening checkout...'
-                                    : isActive
-                                        ? 'Active'
-                                        : `Subscribe — $${price}/mo`}
-                            </Button>
-                        </div>
-                    );
-                })}
-            </div>
+                                {/* Badges */}
+                                <div className="absolute -top-3 left-1/2 flex -translate-x-1/2 gap-2">
+                                    {isActive && (
+                                        <Badge className="bg-brand text-white">Current Plan</Badge>
+                                    )}
+                                    {plan.badge && !isActive && (
+                                        <Badge variant="outline" className="border-brand text-brand bg-background">
+                                            {plan.badge}
+                                        </Badge>
+                                    )}
+                                </div>
+
+                                {/* Plan name */}
+                                <div className="mb-4">
+                                    <h3 className="text-xl font-bold">{plan.name}</h3>
+                                    <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
+                                </div>
+
+                                {/* Price */}
+                                <div className="mb-1 flex items-baseline gap-1">
+                                    <span className="text-4xl font-bold">${price}</span>
+                                    <span className="text-sm text-muted-foreground">/mo</span>
+                                    {billingInterval === 'yearly' && price < originalPrice && (
+                                        <span className="ml-2 text-sm text-muted-foreground line-through">${originalPrice}</span>
+                                    )}
+                                </div>
+                                {/* INR transparency */}
+                                <p className="mb-4 text-xs text-muted-foreground">
+                                    Billed as <strong>₹{inrDisplay.toLocaleString('en-IN')}</strong>
+                                    {billingInterval === 'yearly' ? '/year' : '/month'} in INR
+                                </p>
+
+                                {/* Features */}
+                                <ul className="mb-6 flex-1 space-y-2.5">
+                                    {[
+                                        `${plan.limits.postsPerMonth ?? '∞'} posts / month`,
+                                        `${plan.limits.pillars ?? '∞'} content pillars`,
+                                        `${plan.limits.voiceExamples ?? '∞'} voice examples`,
+                                        plan.limits.regenerationsPerMonth === null
+                                            ? 'Unlimited regenerations'
+                                            : `${plan.limits.regenerationsPerMonth} regenerations / month`,
+                                        plan.features.prioritySupport ? 'Priority email support' : 'Email support',
+                                    ].map((feat, i) => (
+                                        <li key={i} className="flex items-center gap-2.5 text-sm">
+                                            <Check className="h-4 w-4 shrink-0 text-brand" />
+                                            {feat}
+                                        </li>
+                                    ))}
+                                </ul>
+
+                                {/* CTA */}
+                                <Button
+                                    className="mt-auto w-full"
+                                    variant={isActive ? 'outline' : 'primary'}
+                                    disabled={isActive || isCancelledAtEnd || isLoading !== null}
+                                    onClick={() => handleSubscribe(plan.id)}
+                                >
+                                    {isLoading === plan.id
+                                        ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opening checkout…</>
+                                        : ctaLabel}
+                                </Button>
+                                {!hasActiveSub && (
+                                    <p className="mt-2 text-center text-xs text-muted-foreground">
+                                        7-day free trial · No credit card charged upfront
+                                    </p>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             {/* Usage section */}
             {summary && (
@@ -383,6 +609,54 @@ export function BillingSettings() {
                     </CardContent>
                 </Card>
             )}
+
+            {/* Billing history */}
+            <Card>
+                <CardHeader
+                    className="cursor-pointer select-none"
+                    onClick={fetchHistory}
+                >
+                    <CardTitle className="flex items-center justify-between text-base">
+                        <span className="flex items-center gap-2">
+                            <History className="h-4 w-4" />
+                            Payment History
+                        </span>
+                        {showHistory ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </CardTitle>
+                </CardHeader>
+                {showHistory && (
+                    <CardContent>
+                        {historyLoading ? (
+                            <div className="flex justify-center py-4">
+                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                            </div>
+                        ) : history.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-4">No payments yet.</p>
+                        ) : (
+                            <div className="divide-y">
+                                {history.map((p) => (
+                                    <div key={p.id} className="flex items-center justify-between py-3 text-sm">
+                                        <div>
+                                            <p className="font-medium">
+                                                {p.currency} {p.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {format(new Date(p.createdAt), 'MMM d, yyyy')} · via {p.method}
+                                            </p>
+                                        </div>
+                                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold
+                                            ${p.status === 'captured' ? 'bg-emerald-100 text-emerald-700' :
+                                                p.status === 'failed' ? 'bg-red-100 text-red-700' :
+                                                    'bg-gray-100 text-gray-600'}`}>
+                                            {p.status}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                )}
+            </Card>
         </div>
     );
 }
