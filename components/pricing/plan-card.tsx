@@ -20,7 +20,7 @@ export function PlanCard({ planId, plan, billing }: PlanCardProps) {
     // If already signed in → go to billing in the app.
     // If not → go to sign-up and then to billing after auth.
     const signUpHref = planId === 'growth' ? '/sign-up?plan=growth' : '/sign-up';
-    const billingHref = `/settings/billing?plan=${planId}&billing=${billing}`;
+    const billingHref = `/settings?tab=billing&plan=${planId}&billing=${billing}`;
     const ctaHref = isSignedIn ? billingHref : signUpHref;
 
     const handleCTA = (e: React.MouseEvent) => {

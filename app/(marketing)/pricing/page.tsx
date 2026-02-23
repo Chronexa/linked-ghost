@@ -15,7 +15,7 @@ export default function PricingPage() {
 
     const handleBottomCTA = () => {
         if (isSignedIn) {
-            router.push('/settings/billing?plan=growth&billing=yearly');
+            router.push('/settings?tab=billing&plan=growth&billing=yearly');
         } else {
             router.push('/sign-up');
         }
