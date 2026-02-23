@@ -14,88 +14,73 @@ interface PlanCardProps {
 export function PlanCard({ planId, plan, billing }: PlanCardProps) {
     const { isSignedIn } = useUser();
     const router = useRouter();
-    const isGrowth = planId === 'growth';
-    const price = billing === 'monthly' ? plan.monthlyPriceUsd : plan.yearlyMonthlyEquivalent;
 
-    // If already signed in → go to billing in the app.
-    // If not → go to sign-up and then to billing after auth.
-    const signUpHref = planId === 'growth' ? '/sign-up?plan=growth' : '/sign-up';
-    const billingHref = `/settings?tab=billing&plan=${planId}&billing=${billing}`;
-    const ctaHref = isSignedIn ? billingHref : signUpHref;
+    const price = billing === 'yearly' ? plan.yearlyMonthlyEquivalent : plan.monthlyPriceUsd;
+    const originalPrice = plan.monthlyPriceUsd;
+    const isGrowth = planId === 'growth';
 
     const handleCTA = (e: React.MouseEvent) => {
         e.preventDefault();
-        router.push(ctaHref);
+        // Always set plan cookie before navigating — preserves intent through auth wall
+        document.cookie = `cp_selected_plan=${planId}:${billing}; path=/; max-age=3600; SameSite=Lax`;
+
+        if (isSignedIn) {
+            // Signed-in → dedicated checkout page
+            router.push(`/billing?plan=${planId}&billing=${billing}`);
+        } else {
+            // Not signed-in → auth, cookie carries plan intent
+            router.push('/sign-up');
+        }
     };
 
-    if (isGrowth) {
-        return (
-            <div className="relative rounded-2xl border-2 border-[#C1502E] bg-white p-8 flex flex-col shadow-[0_8px_30px_rgba(193,80,46,0.12)] transition-shadow duration-200 hover:shadow-[0_12px_40px_rgba(193,80,46,0.18)]">
-                {/* Most Popular Badge */}
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                    <span className="bg-[#C1502E] text-white text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-full whitespace-nowrap">
-                        Most Popular
-                    </span>
-                </div>
-
-                <h3 className="font-display text-lg font-semibold text-[#1A1A1D]">{plan.name}</h3>
-                <p className="text-sm text-[#52525B] mt-1">{plan.description}</p>
-
-                <div className="mt-6 mb-8 min-h-[5rem]">
-                    <div className="flex items-end gap-1">
-                        <span key={billing} className="font-display text-5xl font-semibold text-[#1A1A1D]">${price}</span>
-                        <span className="text-[#52525B] text-sm mb-2">/month</span>
-                    </div>
-                    {billing === 'yearly' && (
-                        <p className="text-xs text-[#52525B] mt-1">
-                            Billed ${plan.yearlyPriceUsd}/year —
-                            <span className="line-through ml-1 opacity-60">${plan.monthlyPriceUsd * 12}</span>
-                        </p>
-                    )}
-                </div>
-
-                <button
-                    onClick={handleCTA}
-                    className="w-full h-11 flex items-center justify-center rounded-lg bg-[#C1502E] text-white font-medium text-sm hover:bg-[#A13D22] transition-all shadow-[0_2px_8px_rgba(193,80,46,0.08)]"
-                >
-                    {isSignedIn ? 'Subscribe Now' : 'Start Free Trial'}
-                </button>
-                <p className="text-xs text-center text-[#52525B] mt-3">7-day free trial · No credit card required</p>
-
-                <div className="border-t border-[#E8E2D8] my-6" />
-                <FeatureList planId={planId} planConfig={plan} />
-            </div>
-        );
-    }
-
     return (
-        <div className="relative rounded-2xl border border-[#E8E2D8] bg-white p-8 flex flex-col transition-shadow duration-200 hover:shadow-[0_8px_30px_rgba(193,80,46,0.08)]">
-            <h3 className="font-display text-lg font-semibold text-[#1A1A1D]">{plan.name}</h3>
+        <div className={`relative flex flex-col rounded-2xl border bg-white p-8 shadow-sm transition-shadow hover:shadow-lg
+            ${isGrowth ? 'border-[#C1502E] ring-2 ring-[#C1502E]/20' : 'border-[#E8E2D8]'}`}>
+
+            {/* Badge */}
+            {plan.badge && (
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#C1502E] px-3 py-1 text-xs font-semibold text-white uppercase tracking-wide">
+                    {plan.badge}
+                </span>
+            )}
+
+            {/* Plan Name & Description */}
+            <h3 className="text-xl font-bold text-[#1A1A1D] mt-2">{plan.name}</h3>
             <p className="text-sm text-[#52525B] mt-1">{plan.description}</p>
 
-            <div className="mt-6 mb-8 min-h-[5rem]">
-                <div className="flex items-end gap-1">
-                    <span key={billing} className="font-display text-5xl font-semibold text-[#1A1A1D]">${price}</span>
-                    <span className="text-[#52525B] text-sm mb-2">/month</span>
-                </div>
-                {billing === 'yearly' && (
-                    <p className="text-xs text-[#52525B] mt-1">
-                        Billed ${plan.yearlyPriceUsd}/year —
-                        <span className="line-through ml-1 opacity-60">${plan.monthlyPriceUsd * 12}</span>
-                    </p>
-                )}
+            {/* Price */}
+            <div className="mt-6 flex items-baseline gap-1">
+                <span className="text-5xl font-bold text-[#1A1A1D]">${price}</span>
+                <span className="text-base text-[#52525B]">/month</span>
             </div>
+            {billing === 'yearly' && (
+                <p className="text-sm text-[#52525B] mt-1">
+                    Billed ${plan.yearlyPriceUsd}/year — <span className="line-through">${originalPrice}</span>
+                </p>
+            )}
+            {billing === 'monthly' && (
+                <p className="text-sm text-[#52525B] mt-1">&nbsp;</p>
+            )}
 
+            {/* CTA — Always "Start Free Trial" */}
             <button
                 onClick={handleCTA}
-                className="w-full h-11 flex items-center justify-center rounded-lg border-2 border-[#1A1A1D] text-[#1A1A1D] font-medium text-sm hover:bg-[#1A1A1D] hover:text-white transition-all"
+                className={`mt-6 flex items-center justify-center h-12 w-full rounded-lg font-semibold text-sm transition-all
+                    ${isGrowth
+                        ? 'bg-[#C1502E] text-white hover:bg-[#E07A5F] shadow-md'
+                        : 'border-2 border-[#1A1A1D] text-[#1A1A1D] hover:bg-[#1A1A1D] hover:text-white'
+                    }`}
             >
-                {isSignedIn ? 'Subscribe Now' : 'Start Free Trial'}
+                Start Free Trial
             </button>
-            <p className="text-xs text-center text-[#52525B] mt-3">7-day free trial · No credit card required</p>
+            <p className="text-center text-xs text-[#9CA3AF] mt-2">
+                7-day free trial · No credit card required
+            </p>
 
-            <div className="border-t border-[#E8E2D8] my-6" />
-            <FeatureList planId={planId} planConfig={plan} />
+            {/* Features */}
+            <div className="mt-6 border-t border-[#E8E2D8] pt-6">
+                <FeatureList planId={planId} planConfig={plan} />
+            </div>
         </div>
     );
 }

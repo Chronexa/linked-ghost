@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 
 /**
  * Clerk Authentication Middleware
- * Protects all routes except public pages
+ * - Protects all routes except public pages
+ * - Detects cp_selected_plan cookie after sign-up → redirects to /trial/start
  */
 
 // Define public routes that don't require authentication
@@ -34,8 +35,15 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(signInUrl);
   }
 
-  // If user is signed in and trying to access sign-in/sign-up, redirect to dashboard
+  // If user is signed in and trying to access sign-in/sign-up, check for plan cookie
   if (userId && (req.nextUrl.pathname.startsWith('/sign-in') || req.nextUrl.pathname.startsWith('/sign-up'))) {
+    const planCookie = req.cookies.get('cp_selected_plan')?.value;
+    if (planCookie) {
+      // Plan intent exists — redirect to trial activation screen
+      const trialUrl = new URL('/trial/start', req.url);
+      return NextResponse.redirect(trialUrl);
+    }
+    // No plan cookie — go to dashboard as before
     const dashboardUrl = new URL('/dashboard', req.url);
     return NextResponse.redirect(dashboardUrl);
   }

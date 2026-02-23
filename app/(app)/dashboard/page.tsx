@@ -9,6 +9,7 @@ import { useChat } from '@/lib/hooks/use-chat';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { QuickPostModal } from '@/components/quick-post/QuickPostModal';
+import { TrialNudge } from '@/components/subscription/trial-nudge';
 
 export default function Dashboard() {
   const searchParams = useSearchParams();
@@ -51,6 +52,7 @@ export default function Dashboard() {
 
   return (
     <>
+      <TrialNudge />
       <EmptyStateDashboard
         onResearchIdeas={() => handleCreateConversation('research')}
         onQuickPrompt={(prompt) => handleCreateConversation(undefined, prompt)}

@@ -9,13 +9,15 @@ import { PlanCard } from '@/components/pricing/plan-card';
 import { PricingFAQ } from '@/components/pricing/pricing-faq';
 
 export default function PricingPage() {
-    const [billing, setBilling] = useState<BillingInterval>('yearly');
+    const [billing, setBilling] = useState<BillingInterval>('monthly');
     const { isSignedIn } = useUser();
     const router = useRouter();
 
     const handleBottomCTA = () => {
+        // Set plan cookie before navigating
+        document.cookie = 'cp_selected_plan=growth:monthly; path=/; max-age=3600; SameSite=Lax';
         if (isSignedIn) {
-            router.push('/settings?tab=billing&plan=growth&billing=yearly');
+            router.push('/billing?plan=growth&billing=monthly');
         } else {
             router.push('/sign-up');
         }
@@ -23,15 +25,15 @@ export default function PricingPage() {
 
     return (
         <div className="bg-[#FFFCF2] min-h-screen pb-24">
-            {/* SECTION 1 — Page Header */}
+            {/* SECTION 1 — Hero: Trial is the headline */}
             <section className="pt-24 pb-12 text-center px-6">
                 <span className="inline-block text-xs font-semibold tracking-widest uppercase text-[#C1502E] mb-4 border border-[#E8E2D8] px-3 py-1 rounded-full bg-white">
                     Simple, Transparent Pricing
                 </span>
 
                 <h1 className="font-display text-5xl font-semibold tracking-tight text-[#1A1A1D] mb-4 max-w-2xl mx-auto">
-                    Your LinkedIn ghostwriter,<br />
-                    <span className="text-[#C1502E]">for less than a coffee a day.</span>
+                    Start free for 7 days.<br />
+                    <span className="text-[#C1502E]">No credit card required.</span>
                 </h1>
 
                 <p className="text-[#52525B] text-lg max-w-xl mx-auto mb-10">
@@ -39,11 +41,11 @@ export default function PricingPage() {
                     Cancel anytime. No contracts.
                 </p>
 
-                {/* SECTION 2 — Billing Toggle */}
+                {/* Billing Toggle — defaults to Monthly */}
                 <BillingToggle billing={billing} setBilling={setBilling} />
             </section>
 
-            {/* SECTION 4 — Social Proof / Trust Strip */}
+            {/* Trust Strip */}
             <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8 py-6 px-6 text-sm text-[#52525B] max-w-4xl mx-auto mb-8">
                 {[
                     '7-day free trial',
@@ -60,7 +62,7 @@ export default function PricingPage() {
                 ))}
             </div>
 
-            {/* SECTION 3 — Plan Cards */}
+            {/* Plan Cards */}
             <section className="px-6 mx-auto max-w-4xl mb-24">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <PlanCard planId="starter" plan={PLANS.starter} billing={billing} />
@@ -68,7 +70,7 @@ export default function PricingPage() {
                 </div>
             </section>
 
-            {/* SECTION 5 — FAQ */}
+            {/* FAQ */}
             <section className="px-6 mx-auto max-w-4xl mb-24">
                 <h2 className="font-display text-3xl font-semibold text-center text-[#1A1A1D] mb-10 tracking-tight">
                     Frequently asked questions
@@ -76,7 +78,7 @@ export default function PricingPage() {
                 <PricingFAQ />
             </section>
 
-            {/* SECTION 6 — Bottom CTA Banner */}
+            {/* Bottom CTA Banner */}
             <section className="px-6 mx-auto max-w-3xl">
                 <div className="rounded-2xl bg-[#1A1A1D] p-12 text-center shadow-2xl">
                     <h2 className="font-display text-3xl font-semibold text-white tracking-tight mb-3">
@@ -90,7 +92,7 @@ export default function PricingPage() {
                         onClick={handleBottomCTA}
                         className="inline-flex items-center h-12 px-8 rounded-lg bg-[#C1502E] text-white font-semibold text-sm hover:bg-[#E07A5F] transition-all shadow-md"
                     >
-                        {isSignedIn ? 'Go to Billing →' : 'Start Your Free Trial →'}
+                        Start Your Free Trial →
                     </button>
                     <p className="text-xs text-[#6B7280] mt-4">
                         7 days free · No credit card · Cancel anytime
