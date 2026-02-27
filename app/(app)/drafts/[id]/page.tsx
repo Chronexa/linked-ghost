@@ -7,8 +7,9 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Textarea, Badge } fro
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDraft, useUpdateDraft, useApproveDraft, useScheduleDraft, useDrafts } from '@/lib/hooks/use-drafts';
 import { cn } from '@/lib/utils';
-import { toast } from 'react-hot-toast';
-import { Copy, Check, ChevronLeft, Calendar, FileText } from 'lucide-react';
+import { toast } from 'sonner';
+import { Copy, Check, ChevronLeft, Calendar, FileText, Sparkles, Wand2, Loader2, Send } from 'lucide-react';
+import { draftsApi } from '@/lib/api-client';
 
 export default function DraftEditorPage() {
   const params = useParams() as { id: string };
@@ -47,11 +48,24 @@ export default function DraftEditorPage() {
     toast.success('Saved changes');
   };
 
-  const handleApprove = async () => {
+  const handlePost = async () => {
     if (!currentDraft) return;
-    await approveDraft.mutateAsync(currentDraft.id);
-    toast.success('Draft approved');
-    // If we have a conversation ID, go back there. Otherwise drafts list.
+
+    // Copy to clipboard
+    navigator.clipboard.writeText(editedText);
+
+    // Show educational toast
+    toast.success('Draft copied! Paste it into LinkedIn. Come back tomorrow to track your engagement.', { duration: 6000 });
+
+    // Open LinkedIn
+    window.open('https://www.linkedin.com/feed/?shareActive=true', '_blank');
+
+    // Save state and mark as posted
+    await updateDraft.mutateAsync({
+      id: currentDraft.id,
+      data: { status: 'posted', fullText: editedText }
+    });
+
     if (conversationId) {
       router.push(`/dashboard?conversationId=${conversationId}`);
     } else {
@@ -144,7 +158,7 @@ export default function DraftEditorPage() {
         text={editedText}
         setText={setEditedText}
         onSave={handleSave}
-        onApprove={handleApprove}
+        onPost={handlePost}
         onReject={handleReject}
         onSchedule={(date) => { setScheduledFor(date); handleSchedule(); }}
         isPending={updateDraft.isPending || approveDraft.isPending}
@@ -159,6 +173,7 @@ function DraftVariantCard({
   text,
   setText,
   onSave,
+  onPost,
   onApprove,
   onReject,
   onSchedule,
@@ -169,7 +184,8 @@ function DraftVariantCard({
   text: string,
   setText: (s: string) => void,
   onSave: () => void,
-  onApprove: () => void,
+  onPost?: () => void,
+  onApprove?: () => void,
   onReject: () => void,
   onSchedule: (date: string) => void,
   isPending: boolean,
@@ -177,6 +193,11 @@ function DraftVariantCard({
 }) {
   const [showScheduler, setShowScheduler] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
+  const [instruction, setInstruction] = useState('');
+  const [isRewriting, setIsRewriting] = useState(false);
+  const [isGeneratingHooks, setIsGeneratingHooks] = useState(false);
+  const [alternateHooks, setAlternateHooks] = useState<string[]>([]);
+
   const charCount = text.length;
   const isOptimal = charCount >= 800 && charCount <= 1300;
   const isTooLong = charCount > 3000;
@@ -219,10 +240,79 @@ function DraftVariantCard({
             onChange={(e) => setText(e.target.value)}
             rows={12}
             placeholder="Post content…"
-            className="border resize-none shadow-sm focus-visible:ring-2 focus-visible:ring-ring min-h-[300px] text-base leading-relaxed p-4 rounded-md"
+            className="border resize-none shadow-sm focus-visible:ring-2 focus-visible:ring-brand/50 bg-background min-h-[300px] text-base leading-relaxed p-4 rounded-md font-sans"
           />
+
+          {/* AI Editor Panel */}
+          <div className="mt-4 space-y-4">
+            {/* Hooks Panel */}
+            {alternateHooks.length > 0 && (
+              <div className="bg-brand/5 border border-brand/20 rounded-lg p-4 animate-in fade-in slide-in-from-top-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-brand flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" /> Pick a better hook
+                  </h4>
+                  <button onClick={() => setAlternateHooks([])} className="text-muted-foreground hover:text-foreground text-xs">Close</button>
+                </div>
+                <div className="space-y-2">
+                  {alternateHooks.map((hook, i) => (
+                    <div
+                      key={i}
+                      onClick={() => {
+                        const paragraphs = text.split('\n\n');
+                        paragraphs[0] = hook;
+                        setText(paragraphs.join('\n\n'));
+                        setAlternateHooks([]);
+                        toast.success('Hook applied!');
+                      }}
+                      className="p-3 text-sm bg-background border rounded-md cursor-pointer hover:border-brand/50 hover:bg-brand/5 transition-colors line-clamp-2"
+                    >
+                      {hook}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Editing Tools */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={instruction}
+                  onChange={e => setInstruction(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && instruction.trim() && !isRewriting) {
+                      e.preventDefault();
+                      handleRewrite();
+                    }
+                  }}
+                  placeholder="Ask AI to rewrite... (e.g. 'make it punchier', 'add more data')"
+                  className="w-full h-10 pl-4 pr-10 text-sm border font-medium rounded-full bg-surface shadow-sm focus:outline-none focus:ring-2 focus:ring-brand/50"
+                  disabled={isRewriting}
+                />
+                <button
+                  onClick={handleRewrite}
+                  disabled={isRewriting || !instruction.trim()}
+                  className="absolute right-1 top-1 h-8 w-8 flex items-center justify-center rounded-full bg-brand text-white disabled:opacity-50"
+                >
+                  {isRewriting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 -ml-0.5" />}
+                </button>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-10 rounded-full shrink-0"
+                onClick={handleRegenerateHooks}
+                disabled={isGeneratingHooks}
+              >
+                {isGeneratingHooks ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
+                Regenerate Hook
+              </Button>
+            </div>
+          </div>
         </div>
-        <div className="px-6 py-4 border-t border-border space-y-3 bg-muted/5">
+        <div className="px-6 py-4 border-t border-border space-y-3 bg-muted/5 rounded-b-xl">
           <div className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
@@ -235,15 +325,28 @@ function DraftVariantCard({
 
             {draft.status === 'draft' && (
               <>
-                <Button
-                  size="sm"
-                  onClick={onApprove}
-                  disabled={isPending}
-                  className="gap-1.5"
-                >
-                  <Check className="h-4 w-4" />
-                  Approve
-                </Button>
+                {onPost ? (
+                  <Button
+                    size="sm"
+                    onClick={onPost}
+                    disabled={isPending}
+                    className="gap-2 bg-brand text-white hover:bg-brand/90"
+                  >
+                    <Check className="h-4 w-4" />
+                    Copy & Post to LinkedIn
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={onApprove}
+                    disabled={isPending}
+                    className="gap-1.5"
+                  >
+                    <Check className="h-4 w-4" />
+                    Approve
+                  </Button>
+                )}
+
                 <Button
                   variant="ghost"
                   size="sm"
@@ -290,4 +393,28 @@ function DraftVariantCard({
       </CardContent>
     </Card>
   );
+
+  async function handleRewrite() {
+    if (!instruction.trim()) return;
+    setIsRewriting(true);
+    try {
+      const res = await draftsApi.rewrite(draft.id, { currentText: text, instruction });
+      if ((res as any)?.rewrittenText) setText((res as any).rewrittenText);
+      toast.success('Draft rewritten!');
+      setInstruction('');
+    } catch (e) {
+      toast.error('Rewrite failed');
+    } finally { setIsRewriting(false); }
+  }
+
+  async function handleRegenerateHooks() {
+    setIsGeneratingHooks(true);
+    try {
+      const res = await draftsApi.rewriteHook(draft.id, { currentText: text });
+      if ((res as any)?.hooks?.length) setAlternateHooks((res as any).hooks);
+      toast.success('Generated new hooks!');
+    } catch (e) {
+      toast.error('Failed to generate hooks');
+    } finally { setIsGeneratingHooks(false); }
+  }
 }

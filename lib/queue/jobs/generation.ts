@@ -67,6 +67,7 @@ export async function generationJob(job: Job<GenerationJobData>) {
             hashtags: variant.post.hashtags,
             characterCount: variant.post.characterCount,
             estimatedEngagement: estimateEngagement(variant.post),
+            embedding: variant.draftEmbedding ?? null,
             status: 'draft' as const,
         }));
 
@@ -81,7 +82,11 @@ export async function generationJob(job: Job<GenerationJobData>) {
                     ...d,
                     style: result.variants[i].style,
                     voiceMatchScore: result.variants[i].voiceMatchScore,
-                    qualityWarnings: result.variants[i].qualityWarnings
+                    qualityWarnings: result.variants[i].qualityWarnings,
+                    qualityMetrics: result.variants[i].qualityMetrics,
+                    qualityGateResult: result.variants[i].qualityGateResult,
+                    compositeScore: result.variants[i].compositeScore,
+                    deduplicationResult: result.variants[i].deduplicationResult,
                 }))
             }
         }).where(eq(conversationMessages.id, messageId));

@@ -44,10 +44,6 @@ const updateProfileSchema = z.object({
   linkedinGoal: z.string().max(50).optional().nullable(),
 
   // Settings
-  targetAudience: z.string().max(500, 'Target audience must be at most 500 characters').optional().nullable(),
-  contentGoal: z.string().max(100, 'Content goal must be at most 100 characters').optional().nullable(),
-  customGoal: z.string().max(200, 'Custom goal must be at most 200 characters').optional().nullable(),
-  writingStyle: z.string().max(500, 'Writing style must be at most 500 characters').optional().nullable(),
   perplexityEnabled: z.boolean().optional(),
   redditEnabled: z.boolean().optional(),
   redditKeywords: z.string().optional().nullable(),

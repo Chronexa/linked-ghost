@@ -38,7 +38,11 @@ async function getSubscriptionAndLimits(userId: string): Promise<{
     });
 
     // Users without a subscription OR with halted/canceled get free trial limits
-    const hasAccess = sub && (sub.status === 'active' || sub.status === 'trialing');
+    const hasAccess = sub && (
+        sub.status === 'active' ||
+        sub.status === 'trialing' ||
+        (sub.status === 'canceled' && sub.cancelAtPeriodEnd === true && new Date(sub.currentPeriodEnd!) > new Date())
+    );
 
     if (!hasAccess || !sub) {
         return { planId: 'free_trial', planConfig: null, limits: FREE_TRIAL_LIMITS, status: sub?.status ?? null };

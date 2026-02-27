@@ -95,70 +95,160 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
         // Relaxed Constraint
         // if (!profile?.voiceEmbedding) return errors.badRequest('Voice not trained.');
 
-        // Generate
-        const genResult = await retry(
-            () => generateDraftVariants({
-                topicTitle: topicTitle,
-                topicDescription: "User's raw thoughts: " + rawThoughts,
-                userPerspective: "CORE CONTENT / RAW THOUGHTS:\n" + rawThoughts + "\n\nINSTRUCTION: Expand these thoughts into a full post.", // Explicit instruction
-                pillarName: pillar.name,
-                pillarDescription: pillar.description || undefined,
-                pillarTone: pillar.tone || undefined,
-                targetAudience: pillar.targetAudience || profile?.targetAudience || undefined,
-                customPrompt: pillar.customPrompt || undefined,
+        // 4. Enqueue Generation Job (Async)
+        // Create a placeholder message first
+        const [assistantDraftMessage] = await db.insert(conversationMessages).values({
+            conversationId,
+            userId: user.id,
+            role: 'assistant',
+            content: `I'm drafting potential posts for you from scratch. This may take a minute...`,
+            messageType: 'text',
+            metadata: {
+                flow: 'write-from-scratch',
+                topicId: newTopic.id,
+                pillarId: effectivePillarId,
+                status: 'processing',
+                type: 'draft_generation_in_progress'
+            }
+        }).returning();
+
+        // Enqueue the heavy lifting
+        try {
+            if (process.env.USE_BACKGROUND_WORKER !== 'true') {
+                throw new Error('SYNC_FALLBACK_REQUESTED_BY_ENV');
+            }
+
+            console.log('🚀 Enqueuing generation job for write-from-scratch:', conversationId);
+            const { enqueueGeneration } = await import('@/lib/queue');
+            await enqueueGeneration({
+                userId: user.id,
+                conversationId,
+                messageId: assistantDraftMessage.id,
+                topicId: newTopic.id,
+                pillarId: effectivePillarId,
+                pillarContext: {
+                    name: pillar.name,
+                    description: pillar.description || undefined,
+                    tone: pillar.tone || undefined,
+                    targetAudience: pillar.targetAudience || undefined,
+                    customPrompt: pillar.customPrompt || undefined,
+                },
+                topicContent: {
+                    title: topicTitle,
+                    summary: "User's raw thoughts: " + rawThoughts,
+                },
+                userPerspective: "CORE CONTENT / RAW THOUGHTS:\n" + rawThoughts + "\n\nINSTRUCTION: Expand these thoughts into a full post.",
                 voiceExamples: examples.map((ex) => ({
                     postText: ex.postText,
-                    embedding: ex.embedding as number[] | undefined,
+                    embedding: ex.embedding,
                 })),
-                masterVoiceEmbedding: (profile?.voiceEmbedding as number[]) || undefined,
-                numVariants: 1, // Default to single draft
-                userId: user.id,
-            }),
-            { maxAttempts: 3, delayMs: 1000, exponentialBackoff: true, retryOn: isRetryableError }
-        );
+                numVariants: 1,
+            });
+            console.log('✅ Job successfully enqueued');
+        } catch (queueError: any) {
+            console.error('❌ Failed to enqueue write-from-scratch job:', queueError);
+            console.warn('⚠️ Switching to SYNCHRONOUS generation fallback.');
+            try {
+                // Generate
+                const genResult = await retry(
+                    () => generateDraftVariants({
+                        topicTitle: topicTitle,
+                        topicDescription: "User's raw thoughts: " + rawThoughts,
+                        userPerspective: "CORE CONTENT / RAW THOUGHTS:\n" + rawThoughts + "\n\nINSTRUCTION: Expand these thoughts into a full post.", // Explicit instruction
+                        pillarName: pillar.name,
+                        pillarDescription: pillar.description || undefined,
+                        pillarTone: pillar.tone || undefined,
+                        targetAudience: pillar.targetAudience || undefined,
+                        customPrompt: pillar.customPrompt || undefined,
+                        voiceExamples: examples.map((ex) => ({
+                            postText: ex.postText,
+                            embedding: ex.embedding as number[] | undefined,
+                        })),
+                        masterVoiceEmbedding: (profile?.voiceEmbedding as number[]) || undefined,
+                        numVariants: 1, // Default to single draft
+                        userId: user.id,
+                    }),
+                    { maxAttempts: 3, delayMs: 1000, exponentialBackoff: true, retryOn: isRetryableError }
+                );
 
-        // Save Drafts
-        const draftsToInsert = genResult.variants.map((variant: any) => ({
-            userId: user.id,
-            conversationId, // Link back to conversation
-            topicId: newTopic.id,
-            pillarId: effectivePillarId!,
-            userPerspective: rawThoughts,
-            variantLetter: variant.variantLetter,
-            fullText: variant.post.fullText,
-            hook: variant.post.hook,
-            body: variant.post.body,
-            cta: variant.post.cta,
-            hashtags: variant.post.hashtags,
-            characterCount: variant.post.characterCount,
-            estimatedEngagement: estimateEngagement(variant.post),
-            status: 'draft' as const,
-            qualityWarnings: variant.qualityWarnings,
-        }));
+                // Save Drafts
+                const draftsToInsert = genResult.variants.map((variant: any) => ({
+                    userId: user.id,
+                    conversationId, // Link back to conversation
+                    topicId: newTopic.id,
+                    pillarId: effectivePillarId!,
+                    userPerspective: rawThoughts,
+                    variantLetter: variant.variantLetter,
+                    fullText: variant.post.fullText,
+                    hook: variant.post.hook,
+                    body: variant.post.body,
+                    cta: variant.post.cta,
+                    hashtags: variant.post.hashtags,
+                    characterCount: variant.post.characterCount,
+                    estimatedEngagement: estimateEngagement(variant.post),
+                    embedding: variant.draftEmbedding ?? null,
+                    status: 'draft' as const,
+                    qualityWarnings: variant.qualityWarnings,
+                }));
 
-        const createdDrafts = await db.insert(generatedDrafts).values(draftsToInsert as any).returning();
+                const createdDrafts = await db.insert(generatedDrafts).values(draftsToInsert as any).returning();
+
+                // 3. Update Message to "Done"
+                await db.update(conversationMessages).set({
+                    content: `I've drafted posts for you from scratch.`,
+                    messageType: 'draft_variants',
+                    metadata: {
+                        drafts: createdDrafts.map((d, i) => ({
+                            ...d,
+                            style: genResult.variants[i].style,
+                            voiceMatchScore: genResult.variants[i].voiceMatchScore,
+                            qualityWarnings: genResult.variants[i].qualityWarnings,
+                            qualityMetrics: genResult.variants[i].qualityMetrics,
+                            qualityGateResult: genResult.variants[i].qualityGateResult,
+                            compositeScore: genResult.variants[i].compositeScore,
+                            deduplicationResult: genResult.variants[i].deduplicationResult,
+                        }))
+                    }
+                }).where(eq(conversationMessages.id, assistantDraftMessage.id));
+
+                await incrementUsage(user.id, 'generate_post', 1);
+
+                // 4. Update Conversation Preview
+                await db.update(conversations).set({
+                    lastMessagePreview: "Generated drafts from scratch",
+                    updatedAt: new Date()
+                }).where(eq(conversations.id, conversationId));
+
+                console.log('✅ Synchronous fallback completed successfully.');
+
+                return responses.ok({
+                    messageId: assistantDraftMessage.id,
+                    status: 'completed'
+                });
+
+            } catch (syncError) {
+                console.error("❌ Synchronous fallback also failed:", syncError);
+                await db.update(conversationMessages).set({
+                    content: "I encountered an error while generating from your thoughts. Please try again.",
+                    metadata: { error: syncError instanceof Error ? syncError.message : String(syncError) }
+                }).where(eq(conversationMessages.id, assistantDraftMessage.id));
+                throw syncError;
+            }
+        }
 
         // Increment usage
         await incrementUsage(user.id, 'generate_post', 2);
 
-        const [assistantResponse] = await db.insert(conversationMessages).values({
-            conversationId,
-            userId: user.id,
-            role: 'assistant',
-            content: `I've turned your thoughts into two posts.`,
-            messageType: 'draft_variants',
-            metadata: {
-                drafts: createdDrafts.map((d, i) => ({ ...d, style: genResult.variants[i].style, voiceMatchScore: genResult.variants[i].voiceMatchScore, qualityWarnings: genResult.variants[i].qualityWarnings }))
-            }
-        }).returning();
-
         await db.update(conversations).set({
             title: topicTitle,
-            lastMessagePreview: "Generated drafts from scratch",
+            lastMessagePreview: "Generating drafts from scratch...",
             updatedAt: new Date()
         }).where(eq(conversations.id, conversationId));
 
-        return responses.created({ drafts: createdDrafts, messageId: assistantResponse.id, topicId: newTopic.id });
+        return responses.accepted({
+            messageId: assistantDraftMessage.id,
+            status: 'processing'
+        });
 
     } catch (error) {
         console.error("Error in write-from-scratch:", error);

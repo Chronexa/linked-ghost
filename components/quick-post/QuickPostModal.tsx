@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { QuickPostForm, QuickPostFormData } from './QuickPostForm';
 import { VariantCard, Variant } from './VariantCard';
 import { apiClient } from '@/lib/api-client';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 
 interface QuickPostModalProps {

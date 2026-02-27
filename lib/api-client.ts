@@ -65,10 +65,6 @@ export const userApi = {
     idealNetworkProfile?: string;
     linkedinGoal?: string;
     // Settings
-    targetAudience?: string;
-    contentGoal?: string;
-    customGoal?: string;
-    writingStyle?: string;
     perplexityEnabled?: boolean;
     redditEnabled?: boolean;
     redditKeywords?: string;
@@ -79,6 +75,8 @@ export const userApi = {
   }) =>
     apiClient.patch('/user/profile', data),
   getSubscription: () => apiClient.get('/user/subscription'),
+  inferOnboarding: (data: { role: string; industry: string; topics: string[]; posts: string[] }) =>
+    apiClient.post('/onboarding/infer', data),
 };
 
 // Voice Training
@@ -148,6 +146,10 @@ export const draftsApi = {
   schedule: (id: string, data: { scheduledFor: string }) =>
     apiClient.post(`/drafts/${id}/schedule`, data),
   cancelSchedule: (id: string) => apiClient.delete(`/drafts/${id}/schedule`),
+  rewrite: (id: string, data: { currentText: string; instruction: string }) =>
+    apiClient.post(`/drafts/${id}/rewrite`, data),
+  rewriteHook: (id: string, data: { currentText: string }) =>
+    apiClient.post(`/drafts/${id}/rewrite-hook`, data),
 };
 
 // Discovery

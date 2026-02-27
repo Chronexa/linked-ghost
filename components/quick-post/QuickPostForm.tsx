@@ -9,7 +9,7 @@ import { RadioCard } from '@/components/ui/radio-card';
 import { usePillars } from '@/lib/hooks/use-pillars';
 import { Loader2, Sparkles, Lightbulb, BookOpen, MessageCircle, Wrench } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export interface QuickPostFormData {
     idea: string;

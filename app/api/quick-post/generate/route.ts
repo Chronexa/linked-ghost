@@ -66,7 +66,7 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
                 pillarName: pillar.name,
                 pillarDescription: pillar.description || undefined,
                 pillarTone: pillar.tone || undefined,
-                targetAudience: pillar.targetAudience || profile?.targetAudience || undefined,
+                targetAudience: pillar.targetAudience || undefined,
                 customPrompt: pillar.customPrompt || undefined,
                 voiceExamples: examples.map((ex) => ({
                     postText: ex.postText,

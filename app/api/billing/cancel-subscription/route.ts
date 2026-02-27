@@ -21,6 +21,13 @@ export const POST = withAuth(async (_req: NextRequest, { user }) => {
             return errors.badRequest('Subscription is already cancelled.');
         }
 
+        const body = await _req.json().catch(() => ({}));
+        const reason = body.reason || null;
+
+        if (!sub.razorpaySubscriptionId) {
+            return errors.badRequest('No Razorpay subscription ID found.');
+        }
+
         // Cancel at period end via Razorpay — user keeps access until currentPeriodEnd
         await razorpay.subscriptions.cancel(sub.razorpaySubscriptionId, false);
 
@@ -29,6 +36,7 @@ export const POST = withAuth(async (_req: NextRequest, { user }) => {
             .set({
                 cancelAtPeriodEnd: true,
                 canceledAt: new Date(),
+                cancellationReason: reason,
                 updatedAt: new Date(),
             })
             .where(eq(subscriptions.userId, user.id));

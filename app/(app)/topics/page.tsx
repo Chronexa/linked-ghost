@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { WritePostModal } from '@/components/topics/write-post-modal';
 import { Search, Layers, Sparkles, Filter, CheckCircle2, Save, X } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 
 type Tab = 'research' | 'ideas' | 'ready';

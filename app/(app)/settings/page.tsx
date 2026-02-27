@@ -100,8 +100,6 @@ function SettingsContent() {
     linkedinUrl: '',
     linkedinHeadline: '',
     linkedinSummary: '',
-    targetAudience: '',
-    writingStyle: '',
   });
   const [defaultInstructions, setDefaultInstructions] = useState('');
 
@@ -111,8 +109,6 @@ function SettingsContent() {
         linkedinUrl: profile.linkedinUrl || '',
         linkedinHeadline: (profile as any).linkedinHeadline ?? '', // Type definition might need update if these fields are missing
         linkedinSummary: (profile as any).linkedinSummary ?? '',
-        targetAudience: (profile as any).targetAudience || '',
-        writingStyle: (profile as any).writingStyle || '',
       });
       // casting profile to any here because defaultInstructions might not be in the Profile interface yet
       setDefaultInstructions((profile as any).defaultInstructions ?? '');
@@ -523,12 +519,6 @@ function SettingsContent() {
                   placeholder="Short bio or summary from your LinkedIn profile — used to personalise research and drafts."
                   rows={3}
                   className="max-w-2xl"
-                />
-                <Input
-                  label="Target audience"
-                  value={accountData.targetAudience}
-                  onChange={(e) => setAccountData((a) => ({ ...a, targetAudience: e.target.value }))}
-                  placeholder="e.g. Tech founders"
                 />
                 <Button type="submit" isLoading={updateProfile.isPending} loadingText="Saving…">
                   Save profile

@@ -211,8 +211,6 @@ What problem do YOU wish was solved?
       voiceConfidenceScore: confidenceScore,
       voiceEmbedding: masterVoiceEmbedding,
       lastVoiceTrainingAt: new Date(),
-      targetAudience: 'SaaS founders and product managers',
-      writingStyle: 'Practical, experienced, conversational',
     });
 
     console.log(`✅ Voice analyzed!`);

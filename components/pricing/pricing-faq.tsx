@@ -29,6 +29,22 @@ const faqs = [
     {
         question: 'Can I use this for multiple LinkedIn accounts?',
         answer: "Currently, each subscription supports one LinkedIn profile. Agency multi-account support is on our roadmap."
+    },
+    {
+        question: 'How does ContentPilot learn my voice?',
+        answer: "You paste 2-3 of your past LinkedIn posts during setup. Our AI analyzes your tone, structure, vocabulary, and style — and uses that as a template for every post it generates."
+    },
+    {
+        question: 'What topics will it write about?',
+        answer: "ContentPilot pulls from news, Reddit, industry publications, and trending conversations in your niche. You define your content pillars (e.g. 'AI trends', 'Founder lessons'), and it stays within those lanes."
+    },
+    {
+        question: 'Will the posts sound AI-generated?',
+        answer: "Not if your voice training is good. ContentPilot matches your vocabulary and writing patterns, not generic AI templates. The more examples you give it, the better it gets."
+    },
+    {
+        question: 'Can I edit the posts before publishing?',
+        answer: "Absolutely. ContentPilot generates drafts — you always review, edit, and decide what goes live. Think of it as a first draft, not an auto-poster."
     }
 ];
 

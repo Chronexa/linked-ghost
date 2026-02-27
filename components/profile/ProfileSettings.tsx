@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useUser, useUpdateProfile } from '@/lib/hooks/use-user';
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 export function ProfileSettings() {
@@ -19,6 +19,7 @@ export function ProfileSettings() {
     const profile = (userData as any)?.data?.profile;
 
     const [formData, setFormData] = useState<any>({});
+    const [showAdvanced, setShowAdvanced] = useState(false);
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({
         identity: true,
         background: false,
@@ -153,199 +154,219 @@ export function ProfileSettings() {
                                     <option value="Other">Other</option>
                                 </select>
                             </div>
-                            <div className="flex justify-end pt-4">
-                                <Button onClick={() => handleSave('identity')} isLoading={updateProfile.isPending} variant="primary">Save Identity</Button>
-                            </div>
+                            <Button
+                                className="w-full mt-4"
+                                onClick={() => handleSave('identity')}
+                                disabled={updateProfile.isPending}
+                            >
+                                {updateProfile.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                Save Basics
+                            </Button>
                         </CardContent>
                     </CollapsibleContent>
                 </Collapsible>
             </Card>
 
-            {/* Background Section */}
-            <Card className="overflow-hidden border-border/60 shadow-sm hover:shadow-card transition-all duration-300">
-                <CardHeader
-                    className="cursor-pointer hover:bg-surface-hover/50 transition-colors py-6"
-                    onClick={() => toggleSection('background')}
-                >
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                            <CardTitle className="text-xl">Professional Background</CardTitle>
-                            <CardDescription>Your career story and expertise</CardDescription>
-                        </div>
-                        {openSections.background ? <ChevronDown className="h-5 w-5 text-charcoal-light" /> : <ChevronRight className="h-5 w-5 text-charcoal-light" />}
-                    </div>
-                </CardHeader>
-                <Collapsible open={openSections.background}>
-                    <CollapsibleContent>
-                        <CardContent className="space-y-6 pt-2 pb-8 px-8 border-t border-border/40 bg-surface/50">
-                            <div className="space-y-3">
-                                <Label className="text-sm font-semibold text-charcoal-light">Years of Experience</Label>
-                                <div className="flex flex-wrap gap-3">
-                                    {['0-2', '3-5', '6-10', '11-15', '15+'].map(range => (
-                                        <Button
-                                            key={range}
-                                            type="button"
-                                            variant={formData.yearsOfExperience === range ? 'primary' : 'secondary'}
-                                            size="sm"
-                                            onClick={() => setFormData({ ...formData, yearsOfExperience: range })}
-                                            className="h-9"
-                                        >
-                                            {range} Years
-                                        </Button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="space-y-3">
-                                <Label className="text-sm font-semibold text-charcoal-light">Key Expertise (Max 5)</Label>
-                                <Input
-                                    value={expertiseInput}
-                                    onChange={e => setExpertiseInput(e.target.value)}
-                                    onKeyDown={addExpertise}
-                                    placeholder="Type and enter..."
-                                />
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                    {(formData.keyExpertise || []).map((skill: string) => (
-                                        <Badge key={skill} variant="neutral" className="gap-1 px-3 py-1.5 text-sm">
-                                            {skill}
-                                            <span
-                                                className="cursor-pointer ml-2 text-charcoal-light/50 hover:text-charcoal"
-                                                onClick={() => removeExpertise(skill)}
-                                            >×</span>
-                                        </Badge>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-sm font-semibold text-charcoal-light">Career Highlights</Label>
-                                <Textarea value={formData.careerHighlights} onChange={e => setFormData({ ...formData, careerHighlights: e.target.value })} rows={4} />
-                            </div>
-                            <div className="flex justify-end pt-4">
-                                <Button onClick={() => handleSave('background')} isLoading={updateProfile.isPending} variant="primary">Save Background</Button>
-                            </div>
-                        </CardContent>
-                    </CollapsibleContent>
-                </Collapsible>
-            </Card>
+            {!showAdvanced ? (
+                <div className="flex justify-center mt-6">
+                    <Button
+                        variant="ghost"
+                        className="text-muted-foreground hover:text-foreground hover:bg-muted"
+                        onClick={() => setShowAdvanced(true)}
+                    >
+                        Configure Advanced Settings <ChevronDown className="ml-2 w-4 h-4" />
+                    </Button>
+                </div>
+            ) : (
+                <div className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500">
 
-            {/* Positioning Section */}
-            <Card className="overflow-hidden border-border/60 shadow-sm hover:shadow-card transition-all duration-300">
-                <CardHeader
-                    className="cursor-pointer hover:bg-surface-hover/50 transition-colors py-6"
-                    onClick={() => toggleSection('positioning')}
-                >
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                            <CardTitle className="text-xl">Personal Positioning</CardTitle>
-                            <CardDescription>How you want to be seen by your audience</CardDescription>
-                        </div>
-                        {openSections.positioning ? <ChevronDown className="h-5 w-5 text-charcoal-light" /> : <ChevronRight className="h-5 w-5 text-charcoal-light" />}
-                    </div>
-                </CardHeader>
-                <Collapsible open={openSections.positioning}>
-                    <CollapsibleContent>
-                        <CardContent className="space-y-6 pt-2 pb-8 px-8 border-t border-border/40 bg-surface/50">
-                            <div className="space-y-3">
-                                <Label className="text-sm font-semibold text-charcoal-light">Archetype</Label>
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                    {['expert', 'thought_leader', 'peer', 'educator', 'builder'].map(id => (
-                                        <div
-                                            key={id}
-                                            className={cn(
-                                                "border rounded-lg py-3 px-2 text-center cursor-pointer text-sm capitalize transition-all duration-200 hover:border-brand/30",
-                                                formData.howYouWantToBeSeen === id
-                                                    ? "border-brand bg-brand/5 font-semibold text-brand shadow-sm"
-                                                    : "border-border bg-surface text-charcoal-light"
-                                            )}
-                                            onClick={() => setFormData({ ...formData, howYouWantToBeSeen: id })}
-                                        >
-                                            {id.replace('_', ' ')}
+                    {/* Background Section */}
+                    <Card className="overflow-hidden border-border/60 shadow-sm hover:shadow-card transition-all duration-300">
+                        <CardHeader
+                            className="cursor-pointer hover:bg-surface-hover/50 transition-colors py-6"
+                            onClick={() => toggleSection('background')}
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <CardTitle className="text-xl">Professional Background</CardTitle>
+                                    <CardDescription>Your career story and expertise</CardDescription>
+                                </div>
+                                {openSections.background ? <ChevronDown className="h-5 w-5 text-charcoal-light" /> : <ChevronRight className="h-5 w-5 text-charcoal-light" />}
+                            </div>
+                        </CardHeader>
+                        <Collapsible open={openSections.background}>
+                            <CollapsibleContent>
+                                <CardContent className="space-y-6 pt-2 pb-8 px-8 border-t border-border/40 bg-surface/50">
+                                    <div className="space-y-3">
+                                        <Label className="text-sm font-semibold text-charcoal-light">Years of Experience</Label>
+                                        <div className="flex flex-wrap gap-3">
+                                            {['0-2', '3-5', '6-10', '11-15', '15+'].map(range => (
+                                                <Button
+                                                    key={range}
+                                                    type="button"
+                                                    variant={formData.yearsOfExperience === range ? 'primary' : 'secondary'}
+                                                    size="sm"
+                                                    onClick={() => setFormData({ ...formData, yearsOfExperience: range })}
+                                                    className="h-9"
+                                                >
+                                                    {range} Years
+                                                </Button>
+                                            ))}
                                         </div>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-sm font-semibold text-charcoal-light">About</Label>
-                                <Textarea value={formData.about} onChange={e => setFormData({ ...formData, about: e.target.value })} rows={5} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-sm font-semibold text-charcoal-light">Unique Angle</Label>
-                                <Textarea value={formData.uniqueAngle} onChange={e => setFormData({ ...formData, uniqueAngle: e.target.value })} rows={3} />
-                            </div>
-                            <div className="flex justify-end pt-4">
-                                <Button onClick={() => handleSave('positioning')} isLoading={updateProfile.isPending} variant="primary">Save Positioning</Button>
-                            </div>
-                        </CardContent>
-                    </CollapsibleContent>
-                </Collapsible>
-            </Card>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <Label className="text-sm font-semibold text-charcoal-light">Key Expertise (Max 5)</Label>
+                                        <Input
+                                            value={expertiseInput}
+                                            onChange={e => setExpertiseInput(e.target.value)}
+                                            onKeyDown={addExpertise}
+                                            placeholder="Type and enter..."
+                                        />
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {(formData.keyExpertise || []).map((skill: string) => (
+                                                <Badge key={skill} variant="neutral" className="gap-1 px-3 py-1.5 text-sm">
+                                                    {skill}
+                                                    <span
+                                                        className="cursor-pointer ml-2 text-charcoal-light/50 hover:text-charcoal"
+                                                        onClick={() => removeExpertise(skill)}
+                                                    >×</span>
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-sm font-semibold text-charcoal-light">Career Highlights</Label>
+                                        <Textarea value={formData.careerHighlights} onChange={e => setFormData({ ...formData, careerHighlights: e.target.value })} rows={4} />
+                                    </div>
+                                    <div className="flex justify-end pt-4">
+                                        <Button onClick={() => handleSave('background')} isLoading={updateProfile.isPending} variant="primary">Save Background</Button>
+                                    </div>
+                                </CardContent>
+                            </CollapsibleContent>
+                        </Collapsible>
+                    </Card>
 
-            {/* Network Section */}
-            <Card className="overflow-hidden border-border/60 shadow-sm hover:shadow-card transition-all duration-300">
-                <CardHeader
-                    className="cursor-pointer hover:bg-surface-hover/50 transition-colors py-6"
-                    onClick={() => toggleSection('network')}
-                >
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                            <CardTitle className="text-xl">Network & Goals</CardTitle>
-                            <CardDescription>Your audience composition and targets</CardDescription>
-                        </div>
-                        {openSections.network ? <ChevronDown className="h-5 w-5 text-charcoal-light" /> : <ChevronRight className="h-5 w-5 text-charcoal-light" />}
-                    </div>
-                </CardHeader>
-                <Collapsible open={openSections.network}>
-                    <CollapsibleContent>
-                        <CardContent className="space-y-6 pt-2 pb-8 px-8 border-t border-border/40 bg-surface/50">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-semibold text-charcoal-light">Current Connections</Label>
-                                    <Input type="number" value={formData.currentConnections} onChange={e => setFormData({ ...formData, currentConnections: e.target.value })} />
+                    {/* Positioning Section */}
+                    <Card className="overflow-hidden border-border/60 shadow-sm hover:shadow-card transition-all duration-300">
+                        <CardHeader
+                            className="cursor-pointer hover:bg-surface-hover/50 transition-colors py-6"
+                            onClick={() => toggleSection('positioning')}
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <CardTitle className="text-xl">Personal Positioning</CardTitle>
+                                    <CardDescription>How you want to be seen by your audience</CardDescription>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-semibold text-charcoal-light">Target</Label>
-                                    <Input type="number" value={formData.targetConnections} onChange={e => setFormData({ ...formData, targetConnections: e.target.value })} />
-                                </div>
+                                {openSections.positioning ? <ChevronDown className="h-5 w-5 text-charcoal-light" /> : <ChevronRight className="h-5 w-5 text-charcoal-light" />}
                             </div>
-                            <div className="space-y-3">
-                                <Label className="text-sm font-semibold text-charcoal-light">Network Composition</Label>
-                                <div className="flex flex-wrap gap-2">
-                                    {['Founders', 'Investors', 'Marketers', 'Engineers', 'Product Managers', 'Recruiters'].map(role => (
-                                        <Badge
-                                            key={role}
-                                            variant={(formData.networkComposition || []).includes(role) ? 'brand' : 'neutral'}
-                                            className={cn("cursor-pointer px-3 py-1.5 transition-all text-sm", (formData.networkComposition || []).includes(role) ? "shadow-sm" : "hover:bg-charcoal/10")}
-                                            onClick={() => addNetworkType(role)}
+                        </CardHeader>
+                        <Collapsible open={openSections.positioning}>
+                            <CollapsibleContent>
+                                <CardContent className="space-y-6 pt-2 pb-8 px-8 border-t border-border/40 bg-surface/50">
+                                    <div className="space-y-3">
+                                        <Label className="text-sm font-semibold text-charcoal-light">Archetype</Label>
+                                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                            {['expert', 'thought_leader', 'peer', 'educator', 'builder'].map(id => (
+                                                <div
+                                                    key={id}
+                                                    className={cn(
+                                                        "border rounded-lg py-3 px-2 text-center cursor-pointer text-sm capitalize transition-all duration-200 hover:border-brand/30",
+                                                        formData.howYouWantToBeSeen === id
+                                                            ? "border-brand bg-brand/5 font-semibold text-brand shadow-sm"
+                                                            : "border-border bg-surface text-charcoal-light"
+                                                    )}
+                                                    onClick={() => setFormData({ ...formData, howYouWantToBeSeen: id })}
+                                                >
+                                                    {id.replace('_', ' ')}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-sm font-semibold text-charcoal-light">About</Label>
+                                        <Textarea value={formData.about} onChange={e => setFormData({ ...formData, about: e.target.value })} rows={5} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-sm font-semibold text-charcoal-light">Unique Angle</Label>
+                                        <Textarea value={formData.uniqueAngle} onChange={e => setFormData({ ...formData, uniqueAngle: e.target.value })} rows={3} />
+                                    </div>
+                                    <div className="flex justify-end pt-4">
+                                        <Button onClick={() => handleSave('positioning')} isLoading={updateProfile.isPending} variant="primary">Save Positioning</Button>
+                                    </div>
+                                </CardContent>
+                            </CollapsibleContent>
+                        </Collapsible>
+                    </Card>
+
+                    {/* Network Section */}
+                    <Card className="overflow-hidden border-border/60 shadow-sm hover:shadow-card transition-all duration-300">
+                        <CardHeader
+                            className="cursor-pointer hover:bg-surface-hover/50 transition-colors py-6"
+                            onClick={() => toggleSection('network')}
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <CardTitle className="text-xl">Network & Goals</CardTitle>
+                                    <CardDescription>Your audience composition and targets</CardDescription>
+                                </div>
+                                {openSections.network ? <ChevronDown className="h-5 w-5 text-charcoal-light" /> : <ChevronRight className="h-5 w-5 text-charcoal-light" />}
+                            </div>
+                        </CardHeader>
+                        <Collapsible open={openSections.network}>
+                            <CollapsibleContent>
+                                <CardContent className="space-y-6 pt-2 pb-8 px-8 border-t border-border/40 bg-surface/50">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <Label className="text-sm font-semibold text-charcoal-light">Current Connections</Label>
+                                            <Input type="number" value={formData.currentConnections} onChange={e => setFormData({ ...formData, currentConnections: e.target.value })} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-sm font-semibold text-charcoal-light">Target</Label>
+                                            <Input type="number" value={formData.targetConnections} onChange={e => setFormData({ ...formData, targetConnections: e.target.value })} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <Label className="text-sm font-semibold text-charcoal-light">Network Composition</Label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {['Founders', 'Investors', 'Marketers', 'Engineers', 'Product Managers', 'Recruiters'].map(role => (
+                                                <Badge
+                                                    key={role}
+                                                    variant={(formData.networkComposition || []).includes(role) ? 'brand' : 'neutral'}
+                                                    className={cn("cursor-pointer px-3 py-1.5 transition-all text-sm", (formData.networkComposition || []).includes(role) ? "shadow-sm" : "hover:bg-charcoal/10")}
+                                                    onClick={() => addNetworkType(role)}
+                                                >
+                                                    {role}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-sm font-semibold text-charcoal-light">Primary Goal</Label>
+                                        <select
+                                            className="select"
+                                            value={formData.linkedinGoal}
+                                            onChange={e => setFormData({ ...formData, linkedinGoal: e.target.value })}
                                         >
-                                            {role}
-                                        </Badge>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-sm font-semibold text-charcoal-light">Primary Goal</Label>
-                                <select
-                                    className="select"
-                                    value={formData.linkedinGoal}
-                                    onChange={e => setFormData({ ...formData, linkedinGoal: e.target.value })}
-                                >
-                                    <option value="">Select...</option>
-                                    <option value="brand">Build Personal Brand</option>
-                                    <option value="leads">Generate Leads</option>
-                                    <option value="hiring">Hiring / Talent</option>
-                                    <option value="networking">Networking</option>
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-sm font-semibold text-charcoal-light">Ideal Network Profile</Label>
-                                <Textarea value={formData.idealNetworkProfile} onChange={e => setFormData({ ...formData, idealNetworkProfile: e.target.value })} rows={3} />
-                            </div>
-                            <div className="flex justify-end pt-4">
-                                <Button onClick={() => handleSave('network')} isLoading={updateProfile.isPending} variant="primary">Save Network</Button>
-                            </div>
-                        </CardContent>
-                    </CollapsibleContent>
-                </Collapsible>
-            </Card>
+                                            <option value="">Select...</option>
+                                            <option value="brand">Build Personal Brand</option>
+                                            <option value="leads">Generate Leads</option>
+                                            <option value="hiring">Hiring / Talent</option>
+                                            <option value="networking">Networking</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-sm font-semibold text-charcoal-light">Ideal Network Profile</Label>
+                                        <Textarea value={formData.idealNetworkProfile} onChange={e => setFormData({ ...formData, idealNetworkProfile: e.target.value })} rows={3} />
+                                    </div>
+                                    <div className="flex justify-end pt-4">
+                                        <Button onClick={() => handleSave('network')} isLoading={updateProfile.isPending} variant="primary">Save Network</Button>
+                                    </div>
+                                </CardContent>
+                            </CollapsibleContent>
+                        </Collapsible>
+                    </Card>
+                </div>
+            )}
         </div>
     );
 }

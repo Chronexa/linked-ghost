@@ -6,7 +6,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pillarsApi } from '@/lib/api-client';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export function usePillars(params?: { status?: string; sort?: string }) {
   return useQuery({

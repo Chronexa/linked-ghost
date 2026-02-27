@@ -6,6 +6,11 @@
 
 import { openai, OPENAI_MODELS, DEFAULT_CONFIG } from './openai';
 import { generateEmbedding, cosineSimilarity } from './embeddings';
+import { scoreGeneratedContent, QualityMetrics } from './quality-metrics';
+import { buildVoiceDNAPromptSection } from './voice-dna';
+import { checkSemanticDuplication, DeduplicationResult } from './deduplication';
+import { runQualityGate, QualityGateResult } from './quality-gate';
+import { analyzeWinningPatterns, buildEngagementIntelligenceSection, WinningPatterns } from './engagement-learning';
 import { getPrompt, PROMPT_KEYS } from '@/lib/prompts/store';
 import { db } from '@/lib/db';
 import { profiles } from '@/lib/db/schema';
@@ -41,14 +46,19 @@ export interface LinkedInPost {
 }
 
 /**
- * Draft variant with voice match score and optional quality warnings
+ * Draft variant with voice match score, quality metrics, and composite ranking
  */
 export interface DraftVariant {
   variantLetter: 'A' | 'B' | 'C';
   post: LinkedInPost;
   voiceMatchScore: number; // 0-100, how well it matches user's voice
   style: string; // "narrative" | "analytical" | "conversational"
-  qualityWarnings?: string[]; // from validatePost() when invalid
+  qualityWarnings?: string[]; // structural warnings + gate failures
+  qualityMetrics?: QualityMetrics; // specificity, credibility, cliché count
+  qualityGateResult?: QualityGateResult; // pass/fail with grade and suggestions
+  compositeScore: number; // weighted: 60% voice match + 40% quality
+  deduplicationResult?: DeduplicationResult; // semantic freshness check
+  draftEmbedding?: number[]; // stored for future dedup comparisons
 }
 
 /**
@@ -73,8 +83,9 @@ interface VoiceExample {
 }
 
 interface AuthorContextConfig {
-  profile: any | null; // Typed as 'any' locally to avoid circular deps, effectively typeof profiles.$inferSelect
+  profile: any | null;
   mode: 'full' | 'minimal' | 'none';
+  winningPatterns?: WinningPatterns | null; // Engagement intelligence from past posts
 }
 
 /**
@@ -149,6 +160,18 @@ export function buildAuthorContext(config: AuthorContextConfig): string {
   context += `- Avoid generic advice; be specific to the ${industry} context.\n`;
   context += `- Use specialized terminology from the user's expertise where natural.\n`;
 
+  // Append Voice DNA structural patterns if available
+  const voiceDNASection = buildVoiceDNAPromptSection(profile.voiceDna as any);
+  if (voiceDNASection) {
+    context += voiceDNASection;
+  }
+
+  // Append Engagement Intelligence if available
+  const engagementSection = buildEngagementIntelligenceSection(config.winningPatterns ?? null);
+  if (engagementSection) {
+    context += engagementSection;
+  }
+
   return context;
 }
 
@@ -203,9 +226,18 @@ export async function generateDraftVariants(params: {
   const profileScore = [hasRole, hasIndustry, hasExpertise, !!profile?.yearsOfExperience].filter(Boolean).length * 25;
   console.log(`   Profile Completeness: ${profileScore}%`);
 
-  // 2. Build Author Context (Mission Objective 1.1)
-  // Default to 'full' mode, can be controlled via feature flag later
-  const authorContext = buildAuthorContext({ profile, mode: 'full' });
+  // 2. Build Author Context with engagement intelligence
+  let winningPatterns: WinningPatterns | null = null;
+  try {
+    winningPatterns = await analyzeWinningPatterns(userId);
+    if (winningPatterns) {
+      console.log(`🏆 Engagement intelligence loaded: ${winningPatterns.stats.totalPostsAnalyzed} posts analyzed`);
+    }
+  } catch (err) {
+    console.error('⚠️ Failed to load engagement intelligence (non-fatal):', err);
+  }
+
+  const authorContext = buildAuthorContext({ profile, mode: 'full', winningPatterns });
 
   const contextParts: string[] = [];
   if (pillarDescription) contextParts.push(`**DESCRIPTION:** ${pillarDescription}`);
@@ -316,31 +348,72 @@ export async function generateDraftVariants(params: {
 
     // Calculate voice match score if master embedding is available
     let voiceMatchScore = 50; // Default
+    let draftEmbedding: number[] | undefined;
 
     if (masterVoiceEmbedding) {
       console.log(`🔍 Calculating voice match for variant ${variant.letter}...`);
-      const draftEmbedding = await generateEmbedding(post.fullText);
+      draftEmbedding = await generateEmbedding(post.fullText);
       const similarity = cosineSimilarity(draftEmbedding, masterVoiceEmbedding);
       voiceMatchScore = Math.round(similarity * 100);
     }
+
+    // Score content quality against user profile
+    const qualityMetrics = scoreGeneratedContent(post.fullText, profile ?? null);
+    console.log(`📊 Quality score for variant ${variant.letter}: ${qualityMetrics.overallScore} (specificity: ${qualityMetrics.specificityScore}, credibility: ${qualityMetrics.credibilityScore}, clichés: ${qualityMetrics.clicheCount})`);
+
+    // Composite score: 60% voice match + 40% quality
+    const compositeScore = Math.round(
+      (voiceMatchScore * 0.6) + (qualityMetrics.overallScore * 0.4)
+    );
+
+    // Semantic deduplication check against past content
+    let deduplicationResult: DeduplicationResult | undefined;
+    try {
+      deduplicationResult = await checkSemanticDuplication({
+        newDraftText: post.fullText,
+        userId,
+      });
+      if (deduplicationResult.recommendation !== 'proceed') {
+        console.warn(`🔄 Dedup ${deduplicationResult.recommendation} for variant ${variant.letter}: ${deduplicationResult.similarityScore} similarity`);
+      }
+    } catch (dedupError) {
+      console.error(`⚠️ Dedup check failed for variant ${variant.letter} (non-fatal):`, dedupError);
+    }
+
+    // Run quality gate
+    const qualityGateResult = runQualityGate(qualityMetrics);
+    console.log(`🚦 Quality gate for variant ${variant.letter}: ${qualityGateResult.passed ? '✅ PASS' : '❌ FAIL'} (grade: ${qualityGateResult.grade})`);
+
+    // Merge gate failures into quality warnings
+    const allWarnings = [
+      ...(qualityWarnings || []),
+      ...qualityGateResult.failures,
+    ];
 
     variants.push({
       variantLetter: variant.letter,
       post,
       voiceMatchScore,
       style: variant.style,
-      qualityWarnings,
+      qualityWarnings: allWarnings.length > 0 ? allWarnings : undefined,
+      qualityMetrics,
+      qualityGateResult,
+      compositeScore,
+      deduplicationResult,
+      draftEmbedding,
     });
   }
 
-  // Sort by voice match score (highest first)
-  variants.sort((a, b) => b.voiceMatchScore - a.voiceMatchScore);
+  // Sort by composite score (highest first) — voice match + quality combined
+  variants.sort((a, b) => b.compositeScore - a.compositeScore);
 
   const generationTime = Date.now() - startTime;
 
   console.log('✅ Draft generation complete!');
   console.log(`   Variants: ${variants.length}`);
+  console.log(`   Composite scores: ${variants.map((v) => `${v.variantLetter}=${v.compositeScore}`).join(', ')}`);
   console.log(`   Voice match scores: ${variants.map((v) => v.voiceMatchScore).join(', ')}`);
+  console.log(`   Quality scores: ${variants.map((v) => v.qualityMetrics?.overallScore ?? 'N/A').join(', ')}`);
   console.log(`   Generation time: ${generationTime}ms`);
 
   return {

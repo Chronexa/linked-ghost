@@ -11,6 +11,8 @@ import { validateBody, getPagination } from '@/lib/api/validate';
 import { rateLimit } from '@/lib/api/rate-limit';
 import { db } from '@/lib/db';
 import { voiceExamples, pillars } from '@/lib/db/schema';
+import { addJob } from '@/lib/queue';
+import { QUEUE_NAMES } from '@/lib/queue/worker';
 import { eq, and, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { canAddVoiceExample } from '@/lib/ai/usage';
@@ -132,8 +134,8 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
       })
       .returning();
 
-    // TODO: Trigger background job to generate embedding
-    // await queue.add('generate-voice-embedding', { exampleId: newExample.id });
+    // Trigger background job to generate embedding
+    await addJob(QUEUE_NAMES.VOICE_EMBEDDING, { exampleId: newExample.id });
 
     return responses.created(newExample);
   } catch (error) {

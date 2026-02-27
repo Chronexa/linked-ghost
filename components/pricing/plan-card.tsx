@@ -21,8 +21,8 @@ export function PlanCard({ planId, plan, billing }: PlanCardProps) {
 
     const handleCTA = (e: React.MouseEvent) => {
         e.preventDefault();
-        // Always set plan cookie before navigating — preserves intent through auth wall
-        document.cookie = `cp_selected_plan=${planId}:${billing}; path=/; max-age=3600; SameSite=Lax`;
+        // Always set plan cookie before navigating — preserves intent through auth wall (24 hours for email verification)
+        document.cookie = `cp_selected_plan=${planId}:${billing}; path=/; max-age=86400; SameSite=Lax`;
 
         if (isSignedIn) {
             // Signed-in → dedicated checkout page

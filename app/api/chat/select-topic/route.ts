@@ -174,7 +174,7 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
                     name: pillar.name,
                     description: pillar.description || undefined,
                     tone: pillar.tone || undefined,
-                    targetAudience: pillar.targetAudience || profile?.targetAudience || undefined,
+                    targetAudience: pillar.targetAudience || undefined,
                     customPrompt: pillar.customPrompt || undefined,
                 },
                 topicContent: {
@@ -205,7 +205,7 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
                     pillarName: pillar.name,
                     pillarDescription: pillar.description || undefined,
                     pillarTone: pillar.tone || undefined,
-                    targetAudience: pillar.targetAudience || profile?.targetAudience || undefined,
+                    targetAudience: pillar.targetAudience || undefined,
                     customPrompt: pillar.customPrompt || undefined,
                     voiceExamples: examples.map((ex) => ({
                         postText: ex.postText,
@@ -230,6 +230,7 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
                     hashtags: variant.post.hashtags,
                     characterCount: variant.post.characterCount,
                     estimatedEngagement: estimateEngagement(variant.post),
+                    embedding: variant.draftEmbedding ?? null,
                     status: 'draft' as const,
                 }));
 
@@ -244,7 +245,11 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
                             ...d,
                             style: result.variants[i].style,
                             voiceMatchScore: result.variants[i].voiceMatchScore,
-                            qualityWarnings: result.variants[i].qualityWarnings
+                            qualityWarnings: result.variants[i].qualityWarnings,
+                            qualityMetrics: result.variants[i].qualityMetrics,
+                            qualityGateResult: result.variants[i].qualityGateResult,
+                            compositeScore: result.variants[i].compositeScore,
+                            deduplicationResult: result.variants[i].deduplicationResult,
                         }))
                     }
                 }).where(eq(conversationMessages.id, assistantDraftMessage.id));

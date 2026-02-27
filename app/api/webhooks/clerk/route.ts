@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
 async function handleUserCreated(evt: WebhookEvent) {
   if (evt.type !== 'user.created') return;
 
-  const { id, email_addresses, first_name, last_name, image_url } = evt.data;
+  const { id, email_addresses, first_name, last_name, image_url, external_accounts } = evt.data;
 
   // Create user in database
   const [newUser] = await db
@@ -101,14 +101,51 @@ async function handleUserCreated(evt: WebhookEvent) {
       avatarUrl: image_url || null,
       status: 'active',
     })
+    .onConflictDoUpdate({
+      target: users.id,
+      set: {
+        email: email_addresses[0]?.email_address || '',
+        fullName: `${first_name || ''} ${last_name || ''}`.trim() || null,
+        avatarUrl: image_url || null,
+      }
+    })
     .returning();
 
-  // Create profile for user
+  // Extract LinkedIn URL from OAuth external accounts (if user signed up with LinkedIn)
+  let linkedinUrl: string | null = null;
+  if (external_accounts && Array.isArray(external_accounts)) {
+    const linkedinAccount = external_accounts.find(
+      (acc: any) => acc.provider === 'oauth_linkedin' || acc.provider === 'oauth_linkedin_oidc'
+    );
+    if (linkedinAccount) {
+      // Construct LinkedIn URL from the public identifier or username
+      const identifier = (linkedinAccount as any).username || (linkedinAccount as any).public_identifier;
+      if (identifier) {
+        linkedinUrl = `https://www.linkedin.com/in/${identifier}`;
+      }
+    }
+  }
+
+  // Create profile for user with LinkedIn URL if available
   await db.insert(profiles).values({
     userId: newUser.id,
+    linkedinUrl: linkedinUrl || undefined,
+    scraperStatus: linkedinUrl ? 'pending' : 'skipped',
   });
 
-  console.log('User created:', newUser.id);
+  // If LinkedIn URL is available, queue the Apify import job
+  if (linkedinUrl && process.env.USE_BACKGROUND_WORKER === 'true') {
+    try {
+      const { enqueueLinkedInImport } = await import('@/lib/queue');
+      await enqueueLinkedInImport(newUser.id, linkedinUrl, id);
+      console.log(`[Webhook] LinkedIn import queued for user ${newUser.id}: ${linkedinUrl}`);
+    } catch (err) {
+      console.error('[Webhook] Failed to queue LinkedIn import:', err);
+      // Non-fatal — user will fall back to manual onboarding
+    }
+  }
+
+  console.log('User created:', newUser.id, linkedinUrl ? `(LinkedIn: ${linkedinUrl})` : '(no LinkedIn)');
 }
 
 /**

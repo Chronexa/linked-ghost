@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth, useUser } from '@clerk/nextjs';
 import { PLANS, type PlanId, type BillingInterval } from '@/lib/config/plans.config';
 import { Loader2, Lock, Check, ChevronDown } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 /**
  * Dedicated Checkout Page — /billing

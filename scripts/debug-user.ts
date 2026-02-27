@@ -36,7 +36,6 @@ async function main() {
     const profile = await db.query.profiles.findFirst({ where: eq(profiles.userId, user.id) });
     console.log('Profile exists:', !!profile);
     console.log('Voice Embedding exists:', !!profile?.voiceEmbedding);
-    console.log('Target Audience:', profile?.targetAudience);
 }
 
 main().catch(console.error).finally(() => process.exit(0));

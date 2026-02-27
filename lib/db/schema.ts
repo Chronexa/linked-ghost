@@ -6,7 +6,7 @@ import { relations } from 'drizzle-orm';
 // ============================================================================
 
 export const userStatusEnum = pgEnum('user_status', ['active', 'inactive', 'suspended']);
-export const pillarStatusEnum = pgEnum('pillar_status', ['active', 'inactive']);
+export const pillarStatusEnum = pgEnum('pillar_status', ['active', 'inactive', 'suggested']);
 export const topicSourceEnum = pgEnum('topic_source', ['perplexity', 'reddit', 'manual', 'fireflies']);
 export const topicStatusEnum = pgEnum('topic_status', ['new', 'classified', 'archived']);
 export const hookAngleEnum = pgEnum('hook_angle', ['emotional', 'analytical', 'storytelling', 'contrarian', 'data_driven']);
@@ -15,6 +15,7 @@ export const planTypeEnum = pgEnum('plan_type', ['starter', 'growth']);
 export const subscriptionStatusEnum = pgEnum('subscription_status', ['active', 'canceled', 'past_due', 'trialing', 'paused', 'halted']);
 export const messageRoleEnum = pgEnum('message_role', ['user', 'assistant']);
 export const messageTypeEnum = pgEnum('message_type', ['text', 'research_request', 'topic_cards', 'perspective_request', 'draft_variants', 'action_prompt']);
+export const performanceTierEnum = pgEnum('performance_tier', ['top_performer', 'above_average', 'average', 'below_average']);
 
 
 // ============================================================================
@@ -67,15 +68,10 @@ export const profiles = pgTable('profiles', {
   idealNetworkProfile: text('ideal_network_profile'),
   linkedinGoal: varchar('linkedin_goal', { length: 50 }), // "brand", "leads", etc.
 
-  // existing fields (maintained for backward compatibility where needed)
-  targetAudience: text('target_audience'), // Kept for legacy, can map to idealNetworkProfile
-  contentGoal: text('content_goal'),
-  customGoal: text('custom_goal'),
-  writingStyle: text('writing_style'),
-
   // Voice & Settings
   voiceConfidenceScore: integer('voice_confidence_score').default(0), // 0-100
   voiceEmbedding: jsonb('voice_embedding'),
+  voiceDna: jsonb('voice_dna'), // Structured voice analysis (VoiceDNA type from lib/ai/voice-dna.ts)
   lastVoiceTrainingAt: timestamp('last_voice_training_at'),
   perplexityEnabled: boolean('perplexity_enabled').default(true),
   redditEnabled: boolean('reddit_enabled').default(false),
@@ -90,6 +86,15 @@ export const profiles = pgTable('profiles', {
 
   // Prompt personalisation: default instructions for all AI (research, classification, draft)
   defaultInstructions: text('default_instructions'),
+
+  // Apify LinkedIn scraper tracking
+  scraperStatus: varchar('scraper_status', { length: 50 }).default('pending'),
+  scraperJobId: varchar('scraper_job_id', { length: 255 }),
+  preferredHookType: varchar('preferred_hook_type', { length: 50 }),
+  voiceArchetype: varchar('voice_archetype', { length: 50 }),
+  linkedinScrapedAt: timestamp('linkedin_scraped_at'),
+  voiceDnaExtractedAt: timestamp('voice_dna_extracted_at'),
+  pillarsGeneratedAt: timestamp('pillars_generated_at'),
 });
 
 // Centralised prompt templates (global defaults; editable in Settings / admin)
@@ -116,7 +121,10 @@ export const pillars = pgTable('pillars', {
   customPrompt: text('custom_prompt'), // Additional instructions for AI
   cta: text('cta'), // e.g., "Subscribe to newsletter"
   positioning: text('positioning'), // e.g., "Contrarian expert"
+  emoji: varchar('emoji', { length: 10 }),
+  exampleTopics: jsonb('example_topics'), // Array of topic ideas for this pillar
   status: pillarStatusEnum('status').notNull().default('active'),
+  sortOrder: integer('sort_order').default(0),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -133,7 +141,11 @@ export const voiceExamples = pgTable('voice_examples', {
   characterCount: integer('character_count').notNull(),
   embedding: jsonb('embedding'), // OpenAI text-embedding-3-small
   status: varchar('status', { length: 50 }).notNull().default('active'),
-  source: voiceExampleSourceEnum('source').notNull().default('own_post'), // own_post | reference
+  source: varchar('voice_example_source_v2', { length: 50 }).notNull().default('own_post'), // own_post | reference | apify_scrape | manual_paste
+  engagementScore: integer('engagement_score').default(0),
+  engagementWeight: integer('engagement_weight').default(1), // 3 for top-3 posts, 1 for rest
+  postDate: timestamp('post_date'),
+  rawApifyData: jsonb('raw_apify_data'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
@@ -192,6 +204,7 @@ export const generatedDrafts = pgTable('generated_drafts', {
   status: draftStatusEnum('status').notNull().default('draft'),
   editedText: text('edited_text'), // User-edited version
   feedbackNotes: text('feedback_notes'), // User notes
+  embedding: jsonb('embedding'), // Draft vector for semantic deduplication
   approvedAt: timestamp('approved_at'),
   scheduledFor: timestamp('scheduled_for'),
   postedAt: timestamp('posted_at'),
@@ -205,8 +218,8 @@ export const generatedDrafts = pgTable('generated_drafts', {
 export const subscriptions = pgTable('subscriptions', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
-  razorpayCustomerId: varchar('razorpay_customer_id', { length: 255 }).notNull(),
-  razorpaySubscriptionId: varchar('razorpay_subscription_id', { length: 255 }).notNull().unique(),
+  razorpayCustomerId: varchar('razorpay_customer_id', { length: 255 }),
+  razorpaySubscriptionId: varchar('razorpay_subscription_id', { length: 255 }).unique(),
   razorpayPlanId: varchar('razorpay_plan_id', { length: 255 }),          // which Razorpay plan_id was used
   billingInterval: varchar('billing_interval', { length: 10 }),            // 'monthly' | 'yearly'
   planType: planTypeEnum('plan_type').notNull(),
@@ -216,6 +229,7 @@ export const subscriptions = pgTable('subscriptions', {
   cancelAtPeriodEnd: boolean('cancel_at_period_end').notNull().default(false),
   canceledAt: timestamp('canceled_at'),
   trialEnd: timestamp('trial_end'),
+  cancellationReason: text('cancellation_reason'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -257,6 +271,35 @@ export const conversationMessages = pgTable('conversation_messages', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+// Post Performance (Engagement tracking for the feedback loop)
+export const postPerformance = pgTable('post_performance', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id', { length: 255 }).notNull().references(() => users.id, { onDelete: 'cascade' }),
+  draftId: uuid('draft_id').references(() => generatedDrafts.id, { onDelete: 'set null' }),
+
+  // Engagement metrics
+  likes: integer('likes').notNull().default(0),
+  comments: integer('comments').notNull().default(0),
+  reposts: integer('reposts').notNull().default(0),
+  impressions: integer('impressions').notNull().default(0),
+
+  // Calculated fields
+  engagementRate: integer('engagement_rate'), // basis points: (likes+comments+reposts)/impressions * 10000
+  performanceTier: performanceTierEnum('performance_tier'),
+
+  // Analysis
+  winningPatterns: jsonb('winning_patterns'), // extracted by AI after sufficient data
+  postText: text('post_text'), // snapshot of the posted text
+
+  // Timestamps
+  postedAt: timestamp('posted_at').notNull(),
+  measuredAt: timestamp('measured_at'), // when metrics were last updated
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export type PostPerformance = typeof postPerformance.$inferSelect;
+
 // ============================================================================
 // RELATIONS
 // ============================================================================
@@ -277,6 +320,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   usageTracking: many(usageTracking),
   conversations: many(conversations),
+  postPerformance: many(postPerformance),
 }));
 
 export const profilesRelations = relations(profiles, ({ one }) => ({

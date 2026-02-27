@@ -90,7 +90,7 @@
   }
 
   body {
-    @apply bg-background;
+    @apply bg-background antialiased;
     color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
   }
@@ -170,5 +170,58 @@
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 1;
+    }
+
+    100% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
+
+  @keyframes float {
+    0% {
+      transform: translateY(0);
+    }
+
+    100% {
+      transform: translateY(-6px);
+    }
+  }
+
+  @keyframes marquee {
+    0% {
+      transform: translateX(0);
+    }
+
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  .animate-shimmer {
+    animation: shimmer 1.5s ease-in-out forwards;
+    animation-iteration-count: 1;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite alternate;
+  }
+
+  .animate-marquee {
+    animation: marquee 20s linear infinite;
+  }
+
+  .skeleton-bg {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
   }
 }

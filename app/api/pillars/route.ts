@@ -17,7 +17,7 @@ import { canAddPillar } from '@/lib/ai/usage';
 
 // Validation schemas
 const createPillarSchema = z.object({
-  name: z.string().min(3, 'Name must be at least 3 characters').max(100, 'Name must be at most 100 characters'),
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name must be at most 100 characters'),
   description: z.string().max(500, 'Description must be at most 500 characters').optional(),
   tone: z.string().max(200, 'Content Voice must be at most 200 characters').optional(),
   targetAudience: z.string().max(200, 'Target audience must be at most 200 characters').optional(),
@@ -102,7 +102,9 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
     });
 
     if (existingPillar) {
-      return errors.conflict('A pillar with this name already exists');
+      // Instead of 409 Conflict, we gracefully return the existing pillar.
+      // This prevents UI deadlocks when users go "Back" and "Next" during onboarding.
+      return responses.ok(existingPillar);
     }
 
     // Generate slug from name; ensure unique per user (C3)

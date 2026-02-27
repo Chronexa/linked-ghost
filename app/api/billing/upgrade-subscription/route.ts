@@ -40,8 +40,10 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
 
         // 1. Cancel existing Razorpay subscription immediately (cancel_at_cycle_end = false)
         try {
-            await razorpay.subscriptions.cancel(existingSub.razorpaySubscriptionId, false);
-            console.log(`[upgrade-subscription] Cancelled old subscription ${existingSub.razorpaySubscriptionId}`);
+            if (existingSub.razorpaySubscriptionId) {
+                await razorpay.subscriptions.cancel(existingSub.razorpaySubscriptionId, false);
+                console.log(`[upgrade-subscription] Cancelled old subscription ${existingSub.razorpaySubscriptionId}`);
+            }
         } catch (cancelErr: any) {
             // Subscription may already be cancelled — proceed anyway
             console.warn(`[upgrade-subscription] Cancel old sub warning: ${cancelErr.message}`);

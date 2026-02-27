@@ -59,7 +59,9 @@ export function withAuth(handler: AuthenticatedHandler) {
       });
 
       if (!dbUser) {
-        // Auto-sync user from Clerk if missing (fixes dev environment issues)
+        // Auto-sync user from Clerk if missing.
+        // On localhost, the Clerk webhook never fires (Clerk can't reach localhost),
+        // so this auto-sync MUST also create the profiles row the webhook would normally create.
         console.log(`User ${clerkUserId} not found in DB. Syncing from Clerk...`);
         try {
           const { currentUser } = await import('@clerk/nextjs/server');
@@ -78,6 +80,33 @@ export function withAuth(handler: AuthenticatedHandler) {
               }).onConflictDoNothing();
 
               console.log(`User ${email} synced to DB.`);
+
+              // Extract LinkedIn URL from OAuth external accounts (mimics webhook logic)
+              let linkedinUrl: string | null = null;
+              const externalAccounts = clerkUser.externalAccounts || [];
+              const linkedinAccount = externalAccounts.find(
+                (acc: any) => acc.provider === 'oauth_linkedin' || acc.provider === 'oauth_linkedin_oidc'
+              );
+              if (linkedinAccount) {
+                const identifier = (linkedinAccount as any).username || (linkedinAccount as any).publicIdentifier;
+                if (identifier) {
+                  linkedinUrl = `https://www.linkedin.com/in/${identifier}`;
+                }
+              }
+
+              // Create the profiles row (this is done by the webhook in prod, but webhook doesn't fire on localhost)
+              const { profiles } = await import('@/lib/db/schema');
+              await db.insert(profiles).values({
+                userId: clerkUserId,
+                linkedinUrl: linkedinUrl || undefined,
+                scraperStatus: linkedinUrl ? 'pending' : 'skipped',
+              }).onConflictDoNothing();
+
+              if (linkedinUrl) {
+                console.log(`[withAuth] Profile created with LinkedIn URL: ${linkedinUrl}`);
+              } else {
+                console.log(`[withAuth] Profile created with no LinkedIn URL (scraperStatus=skipped)`);
+              }
 
               // Retry fetching the user
               const syncedUser = await db.query.users.findFirst({

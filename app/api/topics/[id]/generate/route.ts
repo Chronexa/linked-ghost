@@ -125,7 +125,7 @@ export const POST = withAuth(async (req: NextRequest, { params, user }) => {
           name: pillar?.name || 'General',
           description: pillar?.description,
           tone: pillar?.tone,
-          targetAudience: pillar?.targetAudience || profile.targetAudience,
+          targetAudience: pillar?.targetAudience || undefined,
           customPrompt: pillar?.customPrompt,
         },
         topicContent: {
@@ -160,7 +160,7 @@ export const POST = withAuth(async (req: NextRequest, { params, user }) => {
         pillarName: pillar?.name || 'General',
         pillarDescription: pillar?.description || undefined,
         pillarTone: pillar?.tone || undefined,
-        targetAudience: pillar?.targetAudience || profile?.targetAudience || undefined,
+        targetAudience: pillar?.targetAudience || undefined,
         customPrompt: pillar?.customPrompt || undefined,
         voiceExamples: examples.map((ex) => ({
           postText: ex.postText,

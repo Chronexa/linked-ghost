@@ -3,12 +3,15 @@ import { getRedisConnection, createRedisConnection } from './client';
 import { researchJob } from './jobs/research';
 import { classificationJob } from './jobs/classification';
 import { generationJob } from './jobs/generation';
+import { linkedInImportJob } from './jobs/linkedin-import';
 
 // Define queue names to prevent typos
 export const QUEUE_NAMES = {
     RESEARCH: 'content-research',
     CLASSIFICATION: 'topic-classification',
     GENERATION: 'post-generation',
+    VOICE_EMBEDDING: 'voice-embedding',
+    LINKEDIN_IMPORT: 'linkedin-import',
 };
 
 // Define job types interface
@@ -21,6 +24,8 @@ const handlers: Record<string, JobHandler> = {
     [QUEUE_NAMES.RESEARCH]: researchJob,
     [QUEUE_NAMES.CLASSIFICATION]: classificationJob,
     [QUEUE_NAMES.GENERATION]: generationJob,
+    [QUEUE_NAMES.VOICE_EMBEDDING]: async (job: Job) => { console.log('Mock voice embedding processing for', job.data) },
+    [QUEUE_NAMES.LINKEDIN_IMPORT]: linkedInImportJob,
 };
 
 // Store active workers to prevent duplicate initialization

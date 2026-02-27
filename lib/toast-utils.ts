@@ -1,31 +1,11 @@
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export function showSuccess(message: string) {
-    toast.success(message, {
-        style: {
-            background: '#1A1A1D',
-            color: '#FFFFFF',
-            border: '1px solid #27272A',
-        },
-        iconTheme: {
-            primary: '#52B788',
-            secondary: '#1A1A1D',
-        },
-    });
+    toast.success(message);
 }
 
 export function showError(message: string) {
-    toast.error(message, {
-        style: {
-            background: '#FFF0F0',
-            color: '#DC2626',
-            border: '1px solid #FECACA',
-        },
-        iconTheme: {
-            primary: '#DC2626',
-            secondary: '#FFFFFF',
-        },
-    });
+    toast.error(message);
 }
 
 export function showLoading(message: string) {

@@ -69,3 +69,12 @@ export async function enqueueClassification(topicId: string) {
 export async function enqueueGeneration(draftParams: any) {
     return addJob(QUEUE_NAMES.GENERATION, draftParams);
 }
+
+// Add LinkedIn import job (triggered on user.created if LinkedIn URL available)
+export async function enqueueLinkedInImport(userId: string, linkedinUrl: string, clerkId: string) {
+    return addJob(
+        QUEUE_NAMES.LINKEDIN_IMPORT,
+        { userId, linkedinUrl, clerkId },
+        `linkedin-import-${userId}`
+    );
+}

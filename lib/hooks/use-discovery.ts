@@ -6,7 +6,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { discoveryApi } from '@/lib/api-client';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export function useDiscoverTopics() {
   const queryClient = useQueryClient();

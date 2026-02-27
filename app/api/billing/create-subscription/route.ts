@@ -29,12 +29,15 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
             return errors.badRequest('Selected plan configuration is not yet available. Please contact support.');
         }
 
-        // 1. Idempotency — reject if user already has an active or trialing subscription
+        // 1. Idempotency — reject if user already has an active subscription
         const existingSub = await db.query.subscriptions.findFirst({
             where: eq(subscriptions.userId, user.id),
         });
 
-        if (existingSub && (existingSub.status === 'active' || existingSub.status === 'trialing')) {
+        // Allow checkout if they are on a Clerk-only free trial (trialing but no Razorpay ID)
+        const isClerkTrial = existingSub?.status === 'trialing' && !existingSub?.razorpaySubscriptionId;
+
+        if (existingSub && !isClerkTrial && (existingSub.status === 'active' || existingSub.status === 'trialing')) {
             return responses.conflict({
                 error: `You already have an active ${existingSub.planType} subscription. Please cancel it before switching plans.`,
                 currentPlan: existingSub.planType,
@@ -73,29 +76,8 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
 
         console.log(`[create-subscription] Created Razorpay subscription: ${rzpSubscription.id}`);
 
-        // 4. Save pending subscription to DB
-        const now = new Date();
-        const dbData = {
-            userId: user.id,
-            razorpayCustomerId: customerId,
-            razorpaySubscriptionId: rzpSubscription.id,
-            razorpayPlanId: razorpayPlanId,
-            billingInterval: billingInterval,
-            planType: planId,
-            status: 'trialing' as const,
-            currentPeriodStart: now,
-            currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), // placeholder — webhook will overwrite
-            cancelAtPeriodEnd: false,
-            updatedAt: now,
-        };
-
-        if (existingSub) {
-            await db.update(subscriptions)
-                .set(dbData)
-                .where(eq(subscriptions.userId, user.id));
-        } else {
-            await db.insert(subscriptions).values(dbData);
-        }
+        // 4. Removed DB write to prevent phantom trial exploit. 
+        // DB is only updated via webhooks when payment is actually confirmed.
 
         // 5. Return subscription ID + public key for frontend checkout modal
         return responses.ok({

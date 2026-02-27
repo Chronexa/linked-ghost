@@ -6,7 +6,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { topicsApi, rawTopicsApi } from '@/lib/api-client';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export function useRawTopics(params?: { source?: string; page?: number; limit?: number }) {
   return useQuery({

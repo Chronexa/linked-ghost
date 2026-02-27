@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,7 @@ import {
     Check, AlertTriangle, TrendingUp, X, History,
     CreditCard, Zap, ChevronDown, ChevronUp, Loader2
 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import { useAuth, useUser } from '@clerk/nextjs';
 import { PLANS, type PlanId, type BillingInterval } from '@/lib/config/plans.config';
 import { format } from 'date-fns';
@@ -119,29 +119,130 @@ function TrialBanner({ trialEnd }: { trialEnd: string | null | undefined }) {
 // Cancellation confirm dialog
 // ---------------------------------------------------------------------------
 
-function CancelDialog({ onConfirm, onClose, periodEnd }: {
-    onConfirm: () => void;
+function CancelDialog({ onConfirm, onClose, periodEnd, isCancelling }: {
+    onConfirm: (reason: string | null) => Promise<boolean>;
     onClose: () => void;
     periodEnd: string | null | undefined;
+    isCancelling: boolean;
 }) {
+    const [step, setStep] = useState<1 | 2 | 3>(1);
+    const [reason, setReason] = useState<string | null>(null);
+    const router = useRouter();
+
+    const REASONS = [
+        "Too expensive",
+        "Not using it enough",
+        "Missing a feature I need",
+        "Switching to another tool",
+        "Other"
+    ];
+
+    const handleNext = () => {
+        if (step === 1) setStep(2);
+    };
+
+    const handleFinalCancel = async () => {
+        const success = await onConfirm(reason);
+        if (success) {
+            setStep(3);
+        }
+    };
+
     const formatted = periodEnd ? format(new Date(periodEnd), 'MMMM d, yyyy') : 'end of billing period';
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
             <div className="w-full max-w-md rounded-2xl border bg-background p-6 shadow-2xl">
-                <h3 className="text-lg font-bold mb-2">Cancel Subscription?</h3>
-                <p className="text-sm text-muted-foreground mb-5">
-                    You will retain full access until <strong>{formatted}</strong>. After that, you'll move to the free tier (3 posts/month). This cannot be undone.
-                </p>
-                <div className="flex gap-3 justify-end">
-                    <Button variant="outline" onClick={onClose}>Keep Subscription</Button>
-                    <Button
-                        variant="outline"
-                        className="border-destructive text-destructive hover:bg-destructive hover:text-white"
-                        onClick={() => { onConfirm(); onClose(); }}
-                    >
-                        Yes, Cancel
-                    </Button>
-                </div>
+                {step === 1 && (
+                    <>
+                        <h3 className="text-lg font-bold mb-2">Cancel your subscription?</h3>
+                        <p className="text-sm text-muted-foreground mb-5">
+                            You'll lose access on <strong>{formatted}</strong>.<br />
+                            Your posts and pillars will be paused.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-3 justify-end items-center">
+                            <Button variant="outline" className="w-full sm:w-auto" onClick={onClose} disabled={isCancelling}>Keep My Plan</Button>
+                            <Button
+                                variant="outline"
+                                className="w-full sm:w-auto border-destructive text-destructive hover:bg-destructive hover:text-white"
+                                onClick={handleNext}
+                                disabled={isCancelling}
+                            >
+                                Continue Cancelling
+                            </Button>
+                        </div>
+                    </>
+                )}
+
+                {step === 2 && (
+                    <>
+                        <h3 className="text-lg font-bold mb-2">We're sorry to see you go.</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                            What's the main reason?
+                        </p>
+                        <div className="space-y-2 mb-6">
+                            {REASONS.map(r => (
+                                <button
+                                    key={r}
+                                    onClick={() => setReason(r)}
+                                    className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${reason === r ? 'border-brand bg-brand/5 font-medium' : 'border-border hover:bg-muted'
+                                        }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={`h-4 w-4 rounded-full border flex items-center justify-center ${reason === r ? 'border-brand bg-brand text-transparent' : 'border-muted-foreground'
+                                            }`}>
+                                            {reason === r && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                                        </div>
+                                        <span className="text-sm">{r}</span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex flex-col-reverse sm:flex-row gap-3 justify-end items-center">
+                            <Button variant="ghost" className="w-full sm:w-auto" onClick={() => setStep(1)} disabled={isCancelling}>Back</Button>
+                            <Button
+                                className="bg-destructive hover:bg-destructive/90 text-white w-full sm:w-auto px-6"
+                                onClick={handleFinalCancel}
+                                disabled={!reason || isCancelling}
+                            >
+                                {isCancelling ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Cancelling...</> : 'Cancel My Subscription'}
+                            </Button>
+                        </div>
+                    </>
+                )}
+
+                {step === 3 && (
+                    <>
+                        <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+                            <Check className="h-5 w-5 text-emerald-500" />
+                            Subscription cancelled
+                        </h3>
+                        <p className="text-sm text-muted-foreground mb-6">
+                            You still have access until<br />
+                            <strong>{formatted}</strong>.
+                        </p>
+                        <div className="space-y-3">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Changed your mind?</p>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <Button
+                                    className="w-full flex-1"
+                                    onClick={() => {
+                                        onClose();
+                                        router.push('/billing');
+                                    }}
+                                >
+                                    Reactivate My Plan
+                                </Button>
+                                <Button variant="outline" className="w-full flex-1" onClick={() => {
+                                    onClose();
+                                    router.push('/dashboard');
+                                }}>
+                                    Go to Dashboard
+                                </Button>
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );
@@ -153,22 +254,22 @@ function CancelDialog({ onConfirm, onClose, periodEnd }: {
 
 function PaymentSuccessBanner({ planName, onDismiss }: { planName: string; onDismiss: () => void }) {
     return (
-        <div className="flex items-start justify-between gap-4 rounded-xl border border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/30 px-5 py-4">
+        <div className="flex items-start justify-between gap-4 rounded-xl border border-[#1A1A1D] bg-[#1A1A1D] px-5 py-4 shadow-xl animate-in fade-in slide-in-from-top-2">
             <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
                     <Check className="h-5 w-5" />
                 </div>
                 <div>
-                    <p className="font-semibold text-emerald-800 dark:text-emerald-300">
-                        Payment successful! Activating {planName} plan…
+                    <p className="font-semibold text-white">
+                        ✅ Payment successful! Activating {planName} plan…
                     </p>
-                    <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
-                        Your plan will be active within 30 seconds. Refresh the page if limits don't update.
+                    <p className="text-sm text-gray-300 mt-1">
+                        Your plan will be active within 30 seconds. Checking in background...
                     </p>
                 </div>
             </div>
-            <button onClick={onDismiss} className="shrink-0 opacity-60 hover:opacity-100 mt-0.5">
-                <X className="h-4 w-4" />
+            <button onClick={onDismiss} className="shrink-0 text-gray-400 hover:text-white mt-1 transition-colors">
+                <X className="h-5 w-5" />
             </button>
         </div>
     );
@@ -206,6 +307,7 @@ export function BillingSettings() {
     const { getToken } = useAuth();
     const { user: clerkUser } = useUser();
     const searchParams = useSearchParams();
+    const router = useRouter();
     const autoCheckoutTriggered = useRef(false);
 
     const fetchUsageSummary = useCallback(async () => {
@@ -308,13 +410,22 @@ export function BillingSettings() {
                     // Poll until webhook confirms status change (max 30 seconds)
                     let attempts = 0;
                     const poll = setInterval(async () => {
-                        await fetchUsageSummary();
+                        try {
+                            const token = await getToken();
+                            const res = await fetch('/api/user/subscription', { headers: { Authorization: `Bearer ${token}` } });
+                            if (res.ok) {
+                                const json = await res.json();
+                                setSummary(json.data ?? null);
+                                if (json.data?.status === 'active') {
+                                    clearInterval(poll);
+                                }
+                            }
+                        } catch { /* ignore */ }
                         attempts++;
                         if (attempts >= 15) {
                             clearInterval(poll);
                         }
                     }, 2000);
-                    setTimeout(() => clearInterval(poll), 32000);
                 },
             };
 
@@ -331,26 +442,26 @@ export function BillingSettings() {
         }
     };
 
-    const handleCancel = async () => {
+    const handleCancel = async (reason: string | null): Promise<boolean> => {
         setIsCancelling(true);
         try {
             const token = await getToken();
             const res = await fetch('/api/billing/cancel-subscription', {
                 method: 'POST',
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ reason })
             });
             const data = await res.json();
             if (res.ok) {
-                toast.success('Subscription cancelled. Access continues until ' +
-                    (summary?.currentPeriodEnd
-                        ? format(new Date(summary.currentPeriodEnd), 'MMM d, yyyy')
-                        : 'end of billing period'));
                 await fetchUsageSummary();
+                return true;
             } else {
                 toast.error(data.error?.message || 'Failed to cancel. Please contact support.');
+                return false;
             }
         } catch {
             toast.error('Failed to cancel. Please try again.');
+            return false;
         } finally {
             setIsCancelling(false);
         }
@@ -395,6 +506,7 @@ export function BillingSettings() {
                     periodEnd={summary?.currentPeriodEnd}
                     onConfirm={handleCancel}
                     onClose={() => setShowCancelDialog(false)}
+                    isCancelling={isCancelling}
                 />
             )}
 
@@ -476,7 +588,7 @@ export function BillingSettings() {
             {checkoutLoading && <CheckoutLoading />}
 
             {/* Plan cards */}
-            {!checkoutLoading && (
+            {!checkoutLoading && (!hasActiveSub || subStatus === 'trialing') && (
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     {(Object.values(PLANS) as typeof PLANS[PlanId][]).map((plan) => {
                         const isActive = activePlanId === plan.id && hasActiveSub;
@@ -627,11 +739,13 @@ export function BillingSettings() {
                 {showHistory && (
                     <CardContent>
                         {historyLoading ? (
-                            <div className="flex justify-center py-4">
+                            <div className="flex justify-center py-6">
                                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                             </div>
                         ) : history.length === 0 ? (
-                            <p className="text-sm text-muted-foreground text-center py-4">No payments yet.</p>
+                            <div className="text-center py-6">
+                                <p className="text-sm text-muted-foreground">Payment history will appear here after your first billing cycle.</p>
+                            </div>
                         ) : (
                             <div className="divide-y">
                                 {history.map((p) => (

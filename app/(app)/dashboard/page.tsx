@@ -7,7 +7,7 @@ import { EmptyStateDashboard } from '@/components/chat/EmptyStateDashboard';
 import { useConversations } from '@/lib/hooks/use-conversations';
 import { useChat } from '@/lib/hooks/use-chat';
 import { Loader2 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import { QuickPostModal } from '@/components/quick-post/QuickPostModal';
 import { TrialNudge } from '@/components/subscription/trial-nudge';
 
@@ -55,7 +55,6 @@ export default function Dashboard() {
       <TrialNudge />
       <EmptyStateDashboard
         onResearchIdeas={() => handleCreateConversation('research')}
-        onQuickPrompt={(prompt) => handleCreateConversation(undefined, prompt)}
         onQuickPost={() => setIsQuickPostOpen(true)}
       />
       <QuickPostModal

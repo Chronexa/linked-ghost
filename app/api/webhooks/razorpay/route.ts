@@ -63,13 +63,42 @@ export async function POST(req: NextRequest) {
                 const trialEnd = subscriptionEntity?.trial_end
                     ? new Date(subscriptionEntity.trial_end * 1000)
                     : null;
-                await db.update(subscriptions)
-                    .set({
+                const userId = subscriptionEntity?.notes?.userId;
+
+                if (userId) {
+                    const planId = subscriptionEntity?.notes?.planId || 'growth';
+                    const billingInterval = subscriptionEntity?.notes?.billingInterval || 'monthly';
+
+                    await db.insert(subscriptions).values({
+                        userId,
+                        razorpaySubscriptionId: subscriptionId,
+                        razorpayPlanId: subscriptionEntity?.plan_id,
+                        billingInterval,
+                        planType: planId,
                         status: 'trialing',
                         trialEnd: trialEnd ?? undefined,
-                        updatedAt: new Date(),
-                    })
-                    .where(eq(subscriptions.razorpaySubscriptionId, subscriptionId));
+                        currentPeriodStart: new Date(),
+                        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // placeholder until charged
+                        updatedAt: new Date()
+                    }).onConflictDoUpdate({
+                        target: subscriptions.userId,
+                        set: {
+                            razorpaySubscriptionId: subscriptionId,
+                            status: 'trialing',
+                            trialEnd: trialEnd ?? undefined,
+                            updatedAt: new Date(),
+                        }
+                    });
+                } else {
+                    await db.update(subscriptions)
+                        .set({
+                            status: 'trialing',
+                            trialEnd: trialEnd ?? undefined,
+                            updatedAt: new Date(),
+                        })
+                        .where(eq(subscriptions.razorpaySubscriptionId, subscriptionId));
+                }
+
                 console.log(`[rzp-webhook] ${subscriptionId} → trialing`);
                 break;
             }
@@ -82,14 +111,43 @@ export async function POST(req: NextRequest) {
                 const end = subscriptionEntity?.current_end
                     ? new Date(subscriptionEntity.current_end * 1000)
                     : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-                await db.update(subscriptions)
-                    .set({
+                const userId = subscriptionEntity?.notes?.userId;
+
+                if (userId) {
+                    const planId = subscriptionEntity?.notes?.planId || 'growth';
+                    const billingInterval = subscriptionEntity?.notes?.billingInterval || 'monthly';
+
+                    await db.insert(subscriptions).values({
+                        userId,
+                        razorpaySubscriptionId: subscriptionId,
+                        razorpayPlanId: subscriptionEntity?.plan_id,
+                        billingInterval,
+                        planType: planId,
                         status: 'active',
                         currentPeriodStart: start,
                         currentPeriodEnd: end,
-                        updatedAt: new Date(),
-                    })
-                    .where(eq(subscriptions.razorpaySubscriptionId, subscriptionId));
+                        updatedAt: new Date()
+                    }).onConflictDoUpdate({
+                        target: subscriptions.userId,
+                        set: {
+                            razorpaySubscriptionId: subscriptionId,
+                            status: 'active',
+                            currentPeriodStart: start,
+                            currentPeriodEnd: end,
+                            updatedAt: new Date(),
+                        }
+                    });
+                } else {
+                    await db.update(subscriptions)
+                        .set({
+                            status: 'active',
+                            currentPeriodStart: start,
+                            currentPeriodEnd: end,
+                            updatedAt: new Date(),
+                        })
+                        .where(eq(subscriptions.razorpaySubscriptionId, subscriptionId));
+                }
+
                 console.log(`[rzp-webhook] ${subscriptionId} → active`);
                 break;
             }

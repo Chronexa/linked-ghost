@@ -23,16 +23,6 @@ export function OnboardingChecklist() {
     // Calculate checklist items
     const items: ChecklistItem[] = [
         {
-            id: 'goal',
-            label: 'Content goal set',
-            completed: !!profile?.contentGoal,
-        },
-        {
-            id: 'audience',
-            label: 'Target audience defined',
-            completed: !!profile?.targetAudience && profile.targetAudience.length >= 100,
-        },
-        {
             id: 'pillars',
             label: 'Topics selected',
             completed: (userProfile.data.pillars?.length || 0) > 0,

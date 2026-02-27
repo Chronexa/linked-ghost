@@ -191,12 +191,10 @@ export default function PillarsPage() {
                 <Button
                   type="submit"
                   disabled={createPillar.isPending || updatePillar.isPending}
+                  isLoading={createPillar.isPending || updatePillar.isPending}
+                  loadingText="Saving..."
                 >
-                  {createPillar.isPending || updatePillar.isPending
-                    ? 'Saving...'
-                    : editingId
-                      ? 'Update Pillar'
-                      : 'Create Pillar'}
+                  {editingId ? 'Update Pillar' : 'Create Pillar'}
                 </Button>
               </div>
             </form>

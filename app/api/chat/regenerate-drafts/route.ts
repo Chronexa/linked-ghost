@@ -62,77 +62,163 @@ export const POST = withAuth(async (req: NextRequest, { user }) => {
         const profile = await db.query.profiles.findFirst({ where: eq(profiles.userId, user.id) });
         if (!profile?.voiceEmbedding) return errors.badRequest('Voice not trained.');
 
-        // Generate
-        const genResult = await retry(
-            () => generateDraftVariants({
-                topicTitle: topic.content,
-                topicDescription: topic.sourceUrl || undefined,
+        // Create a placeholder message first
+        const [assistantDraftMessage] = await db.insert(conversationMessages).values({
+            conversationId,
+            userId: user.id,
+            role: 'assistant',
+            content: `Regenerating drafts...`,
+            messageType: 'text',
+            metadata: {
+                status: 'processing',
+                type: 'draft_generation_in_progress'
+            }
+        }).returning();
+
+        // Enqueue the heavy lifting
+        try {
+            if (process.env.USE_BACKGROUND_WORKER !== 'true') {
+                throw new Error('SYNC_FALLBACK_REQUESTED_BY_ENV');
+            }
+
+            console.log('🚀 Enqueuing generation job for regenerate-drafts:', conversationId);
+            const { enqueueGeneration } = await import('@/lib/queue');
+            await enqueueGeneration({
+                userId: user.id,
+                conversationId,
+                messageId: assistantDraftMessage.id,
+                topicId: topicId,
+                pillarId: topic.pillarId,
+                pillarContext: {
+                    name: pillar?.name || 'General',
+                    description: pillar?.description || undefined,
+                    tone: pillar?.tone || undefined,
+                    targetAudience: pillar?.targetAudience || undefined,
+                    customPrompt: pillar?.customPrompt || undefined,
+                },
+                topicContent: {
+                    title: topic.content,
+                    summary: topic.sourceUrl || undefined,
+                },
                 userPerspective,
-                pillarName: pillar?.name || 'General',
-                pillarDescription: pillar?.description || undefined,
-                pillarTone: pillar?.tone || undefined,
-                targetAudience: pillar?.targetAudience || profile.targetAudience || undefined,
-                customPrompt: pillar?.customPrompt || undefined,
                 voiceExamples: examples.map((ex) => ({
                     postText: ex.postText,
-                    embedding: ex.embedding as number[] | undefined,
+                    embedding: ex.embedding,
                 })),
-                masterVoiceEmbedding: profile.voiceEmbedding as number[],
                 numVariants: 2,
-                userId: user.id,
-            }),
-            { maxAttempts: 3, delayMs: 1000, exponentialBackoff: true, retryOn: isRetryableError }
-        );
+            });
+            console.log('✅ Job successfully enqueued');
 
-        // Transaction: Delete old, Insert new
-        const createdDrafts = await db.transaction(async (tx) => {
-            await tx.delete(generatedDrafts).where(and(
-                eq(generatedDrafts.topicId, topicId),
-                eq(generatedDrafts.userId, user.id),
-                eq(generatedDrafts.status, 'draft')
-            ));
+        } catch (queueError: any) {
+            console.error('❌ Failed to enqueue regenerate-drafts job:', queueError);
+            console.warn('⚠️ Switching to SYNCHRONOUS generation fallback.');
+            try {
+                // Generate
+                const genResult = await retry(
+                    () => generateDraftVariants({
+                        topicTitle: topic.content,
+                        topicDescription: topic.sourceUrl || undefined,
+                        userPerspective,
+                        pillarName: pillar?.name || 'General',
+                        pillarDescription: pillar?.description || undefined,
+                        pillarTone: pillar?.tone || undefined,
+                        targetAudience: pillar?.targetAudience || undefined,
+                        customPrompt: pillar?.customPrompt || undefined,
+                        voiceExamples: examples.map((ex) => ({
+                            postText: ex.postText,
+                            embedding: ex.embedding as number[] | undefined,
+                        })),
+                        masterVoiceEmbedding: profile.voiceEmbedding as number[],
+                        numVariants: 2,
+                        userId: user.id,
+                    }),
+                    { maxAttempts: 3, delayMs: 1000, exponentialBackoff: true, retryOn: isRetryableError }
+                );
 
-            const draftsToInsert = genResult.variants.map((variant: any) => ({
-                userId: user.id,
-                topicId,
-                pillarId: topic.pillarId,
-                userPerspective,
-                variantLetter: variant.variantLetter,
-                fullText: variant.post.fullText,
-                hook: variant.post.hook,
-                body: variant.post.body,
-                cta: variant.post.cta,
-                hashtags: variant.post.hashtags,
-                characterCount: variant.post.characterCount,
-                estimatedEngagement: estimateEngagement(variant.post),
-                status: 'draft' as const,
-                qualityWarnings: variant.qualityWarnings,
-            }));
+                // Transaction: Delete old, Insert new
+                const createdDrafts = await db.transaction(async (tx) => {
+                    await tx.delete(generatedDrafts).where(and(
+                        eq(generatedDrafts.topicId, topicId),
+                        eq(generatedDrafts.userId, user.id),
+                        eq(generatedDrafts.status, 'draft')
+                    ));
 
-            return await tx.insert(generatedDrafts).values(draftsToInsert).returning();
-        });
+                    const draftsToInsert = genResult.variants.map((variant: any) => ({
+                        userId: user.id,
+                        topicId,
+                        conversationId,
+                        pillarId: topic.pillarId,
+                        userPerspective,
+                        variantLetter: variant.variantLetter,
+                        fullText: variant.post.fullText,
+                        hook: variant.post.hook,
+                        body: variant.post.body,
+                        cta: variant.post.cta,
+                        hashtags: variant.post.hashtags,
+                        characterCount: variant.post.characterCount,
+                        estimatedEngagement: estimateEngagement(variant.post),
+                        embedding: variant.draftEmbedding ?? null,
+                        status: 'draft' as const,
+                        qualityWarnings: variant.qualityWarnings,
+                    }));
+
+                    return await tx.insert(generatedDrafts).values(draftsToInsert).returning();
+                });
+
+                // Update message to Done
+                await db.update(conversationMessages).set({
+                    content: `Regenerated drafts with perspective: "${userPerspective}"`,
+                    messageType: 'draft_variants',
+                    metadata: {
+                        drafts: createdDrafts.map((d, i) => ({
+                            ...d,
+                            style: genResult.variants[i].style,
+                            voiceMatchScore: genResult.variants[i].voiceMatchScore,
+                            qualityWarnings: genResult.variants[i].qualityWarnings,
+                            qualityMetrics: genResult.variants[i].qualityMetrics,
+                            qualityGateResult: genResult.variants[i].qualityGateResult,
+                            compositeScore: genResult.variants[i].compositeScore,
+                            deduplicationResult: genResult.variants[i].deduplicationResult,
+                        }))
+                    }
+                }).where(eq(conversationMessages.id, assistantDraftMessage.id));
+
+                await incrementUsage(user.id, 'regenerate_post', 1);
+
+                await db.update(conversations).set({
+                    lastMessagePreview: "Regenerated drafts",
+                    updatedAt: new Date()
+                }).where(eq(conversations.id, conversationId));
+
+                return responses.ok({
+                    messageId: assistantDraftMessage.id,
+                    status: 'completed',
+                    topicId
+                });
+
+            } catch (syncError) {
+                console.error("❌ Synchronous fallback also failed:", syncError);
+                await db.update(conversationMessages).set({
+                    content: "I encountered an error while regenerating your drafts. Please try again.",
+                    metadata: { error: syncError instanceof Error ? syncError.message : String(syncError) }
+                }).where(eq(conversationMessages.id, assistantDraftMessage.id));
+                throw syncError;
+            }
+        }
 
         // Increment usage
         await incrementUsage(user.id, 'regenerate_post', 2);
 
-        // Save message
-        const [assistantResponse] = await db.insert(conversationMessages).values({
-            conversationId,
-            userId: user.id,
-            role: 'assistant',
-            content: `Regenerated drafts with perspective: "${userPerspective}"`,
-            messageType: 'draft_variants',
-            metadata: {
-                drafts: createdDrafts.map((d, i) => ({ ...d, style: genResult.variants[i].style, voiceMatchScore: genResult.variants[i].voiceMatchScore, qualityWarnings: genResult.variants[i].qualityWarnings }))
-            }
-        }).returning();
-
         await db.update(conversations).set({
-            lastMessagePreview: "Regenerated drafts",
+            lastMessagePreview: "Regenerating drafts...",
             updatedAt: new Date()
         }).where(eq(conversations.id, conversationId));
 
-        return responses.created({ drafts: createdDrafts, messageId: assistantResponse.id, topicId });
+        return responses.accepted({
+            messageId: assistantDraftMessage.id,
+            status: 'processing',
+            topicId
+        });
 
     } catch (error) {
         console.error("Error in regenerate-drafts:", error);

@@ -18,6 +18,7 @@ export function TrialExpired() {
     const [show, setShow] = useState(false);
     const [status, setStatus] = useState<string | null>(null);
     const [daysLeft, setDaysLeft] = useState<number | null>(null);
+    const [planId, setPlanId] = useState<string | null>(null);
 
     const fetchData = useCallback(async () => {
         try {
@@ -28,6 +29,7 @@ export function TrialExpired() {
             if (res.ok) {
                 const data = await res.json();
                 setStatus(data.data?.status ?? null);
+                setPlanId(data.data?.planId ?? null);
                 const trialEnd = data.data?.trialEnd;
                 if (trialEnd) {
                     const days = Math.max(0, Math.ceil(
@@ -42,17 +44,20 @@ export function TrialExpired() {
     useEffect(() => { fetchData(); }, [fetchData]);
 
     useEffect(() => {
-        // Show when trial expired OR subscription is not active
+        // Show when trial expired OR subscription is halted/canceled without ongoing access
         const isExpired = (status === 'trialing' && daysLeft !== null && daysLeft <= 0);
-        const isHalted = status === 'halted' || status === 'canceled';
-        // Don't show if user already has active subscription
-        const isActive = status === 'active';
+        const hasAccess = planId !== 'free_trial' && planId !== null;
+        const isHalted = status === 'halted' || (status === 'canceled' && !hasAccess);
+
+        // Don't show if user already has active/ongoing subscription
+        const isActive = status === 'active' || hasAccess;
 
         if ((isExpired || isHalted) && !isActive) {
             // Check session flag — allow "later" once per session
             const dismissed = sessionStorage.getItem('cp_expired_dismissed');
             if (!dismissed) setShow(true);
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [status, daysLeft]);
 
     if (!show) return null;

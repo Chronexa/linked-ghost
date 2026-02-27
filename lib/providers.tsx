@@ -6,7 +6,7 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from 'react-hot-toast';
+import { Toaster } from 'sonner';
 import { useState } from 'react';
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -26,29 +26,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: '#1F2937',
-            color: '#F9FAFB',
-            borderRadius: '8px',
-          },
-          success: {
-            iconTheme: {
-              primary: '#10B981',
-              secondary: '#F9FAFB',
-            },
-          },
-          error: {
-            iconTheme: {
-              primary: '#EF4444',
-              secondary: '#F9FAFB',
-            },
-          },
-        }}
-      />
+      <Toaster position="top-right" richColors theme="system" />
     </QueryClientProvider>
   );
 }
