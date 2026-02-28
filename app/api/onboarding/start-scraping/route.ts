@@ -46,29 +46,34 @@ export async function POST(req: Request) {
             updatedAt: new Date(),
         }).where(eq(profiles.userId, userId));
 
-        // ALWAYS fire the job directly (non-blocking) so it works without a BullMQ worker.
-        // This is the primary execution path on localhost and Vercel serverless.
-        try {
-            const { linkedInImportJob } = await import('@/lib/queue/jobs/linkedin-import');
-            linkedInImportJob({ id: `direct-${userId}`, data: { userId, linkedinUrl, clerkId: userId } } as any)
-                .catch((err: any) => {
-                    console.error('[StartScraping] Direct job failed:', err);
-                    // Update status to failed so the loading screen falls back to manual
-                    db.update(profiles).set({ scraperStatus: 'failed', updatedAt: new Date() })
-                        .where(eq(profiles.userId, userId)).catch(() => { });
-                });
-            console.log(`[StartScraping] Direct job fired for ${userId}: ${linkedinUrl}`);
-        } catch (err) {
-            console.error('[StartScraping] Failed to fire direct job:', err);
-        }
+        let enqueuedToBullMQ = false;
 
         // Attempt to enqueue to BullMQ for reliable background processing on Railway
         try {
             const { enqueueLinkedInImport } = await import('@/lib/queue');
             await enqueueLinkedInImport(userId, linkedinUrl, userId);
             console.log(`[StartScraping] Successfully queued to BullMQ for Railway worker: ${userId}`);
+            enqueuedToBullMQ = true;
         } catch (err) {
             console.error('[StartScraping] BullMQ enqueue failed (falling back to direct Vercel execution):', err);
+        }
+
+        // Only fire the direct job IF BullMQ enqueue failed
+        // This prevents Vercel from killing the direct job and falsely marking the status as 'failed'
+        if (!enqueuedToBullMQ) {
+            try {
+                const { linkedInImportJob } = await import('@/lib/queue/jobs/linkedin-import');
+                linkedInImportJob({ id: `direct-${userId}`, data: { userId, linkedinUrl, clerkId: userId } } as any)
+                    .catch((err: any) => {
+                        console.error('[StartScraping] Direct job failed:', err);
+                        // Update status to failed so the loading screen falls back to manual
+                        db.update(profiles).set({ scraperStatus: 'failed', updatedAt: new Date() })
+                            .where(eq(profiles.userId, userId)).catch(() => { });
+                    });
+                console.log(`[StartScraping] Direct job fired for ${userId}: ${linkedinUrl}`);
+            } catch (err) {
+                console.error('[StartScraping] Failed to fire direct job:', err);
+            }
         }
 
         return NextResponse.json({ success: true, message: 'Scraping started' });
