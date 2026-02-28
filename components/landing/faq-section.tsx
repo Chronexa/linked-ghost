@@ -6,8 +6,8 @@ import { Plus, Minus } from 'lucide-react';
 
 const faqs = [
     {
-        q: "How is ContentPilot different from ChatGPT?",
-        a: "ChatGPT generates generic content from a blank prompt — it has no idea how you write, what your audience cares about, or what topics are trending right now. ContentPilot builds a persistent voice profile from your past posts, researches trending topics in your niche daily, and generates content specifically calibrated to sound like you. The average match score across all users is 94%.",
+        q: "How is LinkedIn Ghostwriter AI different from ChatGPT?",
+        a: "ChatGPT generates generic content from a blank prompt — it has no idea how you write, what your audience cares about, or what topics are trending right now. LinkedIn Ghostwriter AI builds a persistent voice profile from your past posts, researches trending topics in your niche daily, and generates content specifically calibrated to sound like you. The average match score across all users is 94%.",
     },
     {
         q: "Will LinkedIn flag or penalize my account for using AI-assisted content?",

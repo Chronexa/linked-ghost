@@ -18,7 +18,7 @@ export function HowItWorksSection() {
     }, [isHoveringTabs]);
 
     return (
-        <section id="how-it-works" className="w-full bg-white py-32 border-y border-gray-100" aria-label="How ContentPilot Works">
+        <section id="how-it-works" className="w-full bg-white py-32 border-y border-gray-100" aria-label="How LinkedIn Ghostwriter Works">
             <div className="container mx-auto px-6 max-w-[1100px]">
                 <div className="text-center mb-16">
                     <h2 className="font-display text-4xl md:text-5xl font-bold text-gray-900 mb-6 tracking-tight">
@@ -44,8 +44,8 @@ export function HowItWorksSection() {
                                 aria-selected={activeTab === idx}
                                 onClick={() => setActiveTab(idx)}
                                 className={`text-left p-6 w-72 md:w-auto flex-shrink-0 snap-start rounded-2xl transition-all duration-300 ${activeTab === idx
-                                        ? "bg-blue-50/50 border border-blue-100 shadow-sm"
-                                        : "hover:bg-gray-50 border border-transparent"
+                                    ? "bg-blue-50/50 border border-blue-100 shadow-sm"
+                                    : "hover:bg-gray-50 border border-transparent"
                                     }`}
                             >
                                 <h3 className={`font-semibold text-xl mb-2 ${activeTab === idx ? "text-brand" : "text-gray-900"}`}>

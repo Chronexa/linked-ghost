@@ -7,9 +7,9 @@ export function Footer() {
                 <div className="grid grid-cols-2 md:grid-cols-6 gap-8 md:gap-8 lg:gap-12 mb-16">
                     {/* Brand */}
                     <div className="col-span-2 md:col-span-2">
-                        <Link href="/" className="flex items-center space-x-2 mb-6" aria-label="ContentPilot AI Home">
+                        <Link href="/" className="flex items-center space-x-2 mb-6" aria-label="LinkedIn Ghostwriter AI Home">
                             <span className="text-xl font-display font-semibold text-white tracking-tight">
-                                ContentPilot AI
+                                LinkedIn Ghostwriter AI
                             </span>
                         </Link>
                         <p className="text-sm leading-relaxed mb-6 max-w-xs">
@@ -53,13 +53,14 @@ export function Footer() {
                         <ul className="space-y-4 text-sm font-medium">
                             <li><Link href="/about" className="hover:text-white transition-colors">About</Link></li>
                             <li><Link href="/dashboard" className="hover:text-white transition-colors">Sign In</Link></li>
+                            <li><Link href="/legal/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
                             <li><Link href="/legal/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
                         </ul>
                     </nav>
                 </div>
 
                 <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center text-sm text-gray-500">
-                    <p>© {new Date().getFullYear()} ContentPilot AI. All rights reserved.</p>
+                    <p>© {new Date().getFullYear()} LinkedIn Ghostwriter AI. All rights reserved.</p>
                     <div className="mt-4 md:mt-0">
                         Engineered for LinkedIn Growth
                     </div>

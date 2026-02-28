@@ -14,10 +14,10 @@ export default function SignInPage() {
             Welcome Back
           </h1>
           <p className="text-charcoal-light">
-            Sign in to continue to ContentPilot AI
+            Sign in to continue to LinkedIn Ghostwriter AI
           </p>
         </div>
-        <SignIn 
+        <SignIn
           appearance={{
             elements: {
               rootBox: 'mx-auto',

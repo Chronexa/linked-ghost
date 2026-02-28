@@ -10,7 +10,7 @@ export function FinalCtaSection() {
                     Your next LinkedIn post is 3 minutes away.
                 </h2>
                 <p className="text-xl text-gray-400 mb-12 leading-relaxed max-w-2xl mx-auto">
-                    Join 50+ professionals who've replaced the blank page with ContentPilot AI.
+                    Join 50+ professionals who've replaced the blank page with LinkedIn Ghostwriter AI.
                 </p>
                 <div className="flex justify-center mb-10">
                     <Link href="/sign-up">

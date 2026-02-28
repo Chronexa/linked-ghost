@@ -14,10 +14,10 @@ export default function SignUpPage() {
             Get Started Free
           </h1>
           <p className="text-charcoal-light">
-            Create your ContentPilot AI account
+            Create your LinkedIn Ghostwriter AI account
           </p>
         </div>
-        <SignUp 
+        <SignUp
           appearance={{
             elements: {
               rootBox: 'mx-auto',

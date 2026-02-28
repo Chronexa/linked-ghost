@@ -28,7 +28,7 @@ export function TestimonialsSection() {
                         <div>
                             <div className="text-brand text-lg mb-6 tracking-widest" aria-label="5 stars">★★★★★</div>
                             <p className="text-gray-600 text-[15px] leading-relaxed mb-8">
-                                "ContentPilot understands my voice better than I do."
+                                "LinkedIn Ghostwriter AI understands my voice better than I do."
                             </p>
                         </div>
                         <div className="flex items-center gap-3">

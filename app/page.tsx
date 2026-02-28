@@ -13,13 +13,13 @@ import { FinalCtaSection } from '@/components/landing/final-cta-section';
 import { Footer } from '@/components/landing/footer';
 
 export const metadata = {
-  title: 'ContentPilot AI | Your LinkedIn ghostwriter that sounds like you',
-  description: 'ContentPilot researches trending topics in your niche, learns your writing style, and generates ready-to-post LinkedIn drafts — every day in under 3 minutes.',
+  title: 'LinkedIn Ghostwriter AI | Your LinkedIn ghostwriter that sounds like you',
+  description: 'LinkedIn Ghostwriter AI researches trending topics in your niche, learns your writing style, and generates ready-to-post LinkedIn drafts — every day in under 3 minutes.',
   openGraph: {
-    title: 'ContentPilot AI',
+    title: 'LinkedIn Ghostwriter AI',
     description: 'Stop staring at a blank page. Get AI-generated LinkedIn posts in your unique voice.',
-    url: 'https://contentpilot.ai',
-    siteName: 'ContentPilot AI',
+    url: 'https://www.linkedinghostwriter-ai.com',
+    siteName: 'LinkedIn Ghostwriter AI',
     locale: 'en_US',
     type: 'website',
   },

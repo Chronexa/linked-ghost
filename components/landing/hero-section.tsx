@@ -108,7 +108,7 @@ export function HeroSection() {
                         </h1>
 
                         <p className="text-lg text-gray-500 mb-10 leading-relaxed max-w-lg">
-                            ContentPilot researches trending topics in your niche, learns your writing style, and generates ready-to-post drafts — every day.
+                            LinkedIn Ghostwriter AI researches trending topics in your niche, learns your writing style, and generates ready-to-post drafts — every day.
                         </p>
 
                         <div className="flex flex-col sm:flex-row gap-4 mb-8">
@@ -144,7 +144,7 @@ export function HeroSection() {
                                     <div className="w-2.5 h-2.5 rounded-full bg-green-400"></div>
                                 </div>
                                 <div className="mx-auto flex-1 max-w-[200px] bg-white border border-gray-200 rounded text-[10px] text-gray-400 text-center py-1">
-                                    contentpilot.ai/create
+                                    linkedinghostwriter-ai.com/create
                                 </div>
                                 <div className="w-10"></div>
                             </div>

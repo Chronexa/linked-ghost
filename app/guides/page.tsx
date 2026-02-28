@@ -5,8 +5,8 @@ import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 export const metadata = {
-    title: 'LinkedIn Growth Guides | ContentPilot AI',
-    description: 'Free, actionable guides on growing your personal brand on LinkedIn. Strategy, content, and AI tips from the team at ContentPilot.',
+    title: 'LinkedIn Growth Guides | LinkedIn Ghostwriter AI',
+    description: 'Free, actionable guides on growing your personal brand on LinkedIn. Strategy, content, and AI tips from the team at LinkedIn Ghostwriter AI.',
 };
 
 const guides = [

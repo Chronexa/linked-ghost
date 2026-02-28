@@ -21,7 +21,7 @@ export default function AboutPage() {
                             LinkedIn is the world&apos;s largest professional stage, but most people who belong on it never post. Not because they lack ideas — but because the blank page wins. Every time.
                         </p>
                         <p>
-                            ContentPilot AI was built to solve exactly that. We combine real-time topic research with deep AI voice cloning so that you can spend 3 minutes a day maintaining a consistent, authentic LinkedIn presence — instead of 3 hours or none at all.
+                            LinkedIn Ghostwriter AI was built to solve exactly that. We combine real-time topic research with deep AI voice cloning so that you can spend 3 minutes a day maintaining a consistent, authentic LinkedIn presence — instead of 3 hours or none at all.
                         </p>
                         <p>
                             We are a small, focused team that cares deeply about making AI that doesn&apos;t feel like AI. Our benchmark is simple: if your audience can tell it&apos;s generated, we haven&apos;t done our job.

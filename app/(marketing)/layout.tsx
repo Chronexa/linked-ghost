@@ -14,10 +14,10 @@ export default function MarketingLayout({
                     <div className="flex items-center justify-between h-16">
                         <Link href="/" className="flex items-center space-x-2 group">
                             <div className="w-10 h-10 bg-[#C1502E] rounded-xl flex items-center justify-center transition-transform group-hover:scale-105">
-                                <span className="text-white font-display font-bold text-xl">CP</span>
+                                <span className="text-white font-display font-bold text-xl">LG</span>
                             </div>
                             <span className="text-xl font-display font-semibold text-[#1A1A1D]">
-                                ContentPilot AI
+                                LinkedIn Ghostwriter AI
                             </span>
                         </Link>
                         <div className="hidden md:flex items-center space-x-8">
@@ -48,9 +48,9 @@ export default function MarketingLayout({
                     <div className="flex flex-col md:flex-row items-center justify-between">
                         <div className="flex items-center space-x-2 mb-4 md:mb-0">
                             <div className="w-8 h-8 bg-[#C1502E] rounded-lg flex items-center justify-center">
-                                <span className="text-white font-display font-bold text-lg">CP</span>
+                                <span className="text-white font-display font-bold text-lg">LG</span>
                             </div>
-                            <span className="font-display font-semibold text-[#1A1A1D]">ContentPilot AI</span>
+                            <span className="font-display font-semibold text-[#1A1A1D]">LinkedIn Ghostwriter AI</span>
                         </div>
 
                         <div className="flex items-center space-x-6">

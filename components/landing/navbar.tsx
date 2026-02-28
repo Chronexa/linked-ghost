@@ -19,9 +19,9 @@ export function Navbar() {
         <nav className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-md" aria-label="Main Navigation">
             <div className="max-w-[1100px] mx-auto px-6">
                 <div className="flex items-center justify-between h-16">
-                    <Link href="/" className="flex items-center space-x-2" aria-label="ContentPilot AI Home">
+                    <Link href="/" className="flex items-center space-x-2" aria-label="LinkedIn Ghostwriter AI Home">
                         <span className="text-xl font-display font-semibold text-gray-900 tracking-tight">
-                            ContentPilot AI
+                            LinkedIn Ghostwriter AI
                         </span>
                     </Link>
 

@@ -8,8 +8,8 @@ import { Button } from '@/components/ui';
 import Link from 'next/link';
 
 export const metadata = {
-    title: 'ContentPilot AI for Founders | Build Your Personal Brand',
-    description: 'Raise capital, attract top talent, and build credibility. ContentPilot is the LinkedIn ghostwriter for busy startup founders.',
+    title: 'LinkedIn Ghostwriter AI for Founders | Build Your Personal Brand',
+    description: 'Raise capital, attract top talent, and build credibility. LinkedIn Ghostwriter AI is the LinkedIn ghostwriter for busy startup founders.',
 };
 
 export default function FoundersPage() {
@@ -22,14 +22,14 @@ export default function FoundersPage() {
                 <section className="container mx-auto px-6 pt-32 pb-24 text-center">
                     <div className="max-w-4xl mx-auto">
                         <div className="inline-block bg-blue-50 text-brand px-4 py-1.5 rounded-full text-sm font-bold tracking-wide mb-8 border border-blue-100">
-                            CONTENTPILOT AI FOR FOUNDERS
+                            LINKEDIN GHOSTWRITER AI FOR FOUNDERS
                         </div>
                         <h1 className="font-display text-5xl md:text-6xl font-bold mb-8 leading-[1.1] tracking-tight text-gray-900">
                             Raise capital. Attract talent.<br />Build your founder brand.
                         </h1>
                         <p className="text-xl text-gray-500 mb-12 leading-relaxed max-w-2xl mx-auto">
                             Investors and candidates check your LinkedIn before every call.
-                            ContentPilot generates authentic, thought-leadership posts in your exact voice—taking only 3 minutes a day.
+                            LinkedIn Ghostwriter AI generates authentic, thought-leadership posts in your exact voice—taking only 3 minutes a day.
                         </p>
                         <div className="flex flex-col sm:flex-row justify-center gap-4 mb-10">
                             <Link href="/sign-up">

@@ -94,26 +94,28 @@ export async function triggerMagicMoment(
             numVariants: 1,
         };
 
-        // ALWAYS fire the job directly (non-blocking) so it works without a BullMQ worker.
-        // This prevents Vercel 504 timeouts because we don't await the job's completion.
+        let enqueuedToBullMQ = false;
+
+        // Attempt to enqueue to BullMQ for reliable background processing on Railway
         try {
-            const { generationJob } = await import('@/lib/queue/jobs/generation');
-            // Fire and forget
-            generationJob({ id: `magic-${conversation.id}`, data: jobData } as any)
-                .catch((err: any) => console.error('[MagicMoment] Direct job failed:', err));
-            console.log(`✨ Magic Moment generation fired asynchronously for ${conversation.id}`);
-        } catch (err) {
-            console.error('[MagicMoment] Failed to fire direct job:', err);
+            const { enqueueGeneration } = await import('@/lib/queue');
+            await enqueueGeneration(jobData);
+            console.log(`[MagicMoment] Successfully queued to BullMQ for ${conversation.id}`);
+            enqueuedToBullMQ = true;
+        } catch (queueErr) {
+            console.error('[MagicMoment] BullMQ enqueue failed:', queueErr);
         }
 
-        // Also enqueue to BullMQ if worker is running (for production scalability)
-        if (process.env.USE_BACKGROUND_WORKER === 'true') {
+        // Only fire the direct job IF BullMQ enqueue failed (prevents Vercel killing the promise)
+        if (!enqueuedToBullMQ) {
             try {
-                const { enqueueGeneration } = await import('@/lib/queue');
-                await enqueueGeneration(jobData);
-                console.log(`[MagicMoment] Also queued to BullMQ for ${conversation.id}`);
-            } catch (queueErr) {
-                console.error('[MagicMoment] Failed to enqueue:', queueErr);
+                const { generationJob } = await import('@/lib/queue/jobs/generation');
+                // Fire and forget
+                generationJob({ id: `magic-${conversation.id}`, data: jobData } as any)
+                    .catch((err: any) => console.error('[MagicMoment] Direct job failed:', err));
+                console.log(`✨ Magic Moment generation fired asynchronously for ${conversation.id}`);
+            } catch (err) {
+                console.error('[MagicMoment] Failed to fire direct job:', err);
             }
         }
 

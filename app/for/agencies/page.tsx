@@ -8,8 +8,8 @@ import { Button } from '@/components/ui';
 import Link from 'next/link';
 
 export const metadata = {
-    title: 'ContentPilot AI for Ghostwriters & Agencies | Scale Operations',
-    description: 'Manage multiple client voices effortlessly and scale your ghostwriting agency with ContentPilot.',
+    title: 'LinkedIn Ghostwriter AI for Ghostwriters & Agencies | Scale Operations',
+    description: 'Manage multiple client voices effortlessly and scale your ghostwriting agency with LinkedIn Ghostwriter AI.',
 };
 
 export default function AgenciesPage() {
@@ -22,14 +22,14 @@ export default function AgenciesPage() {
                 <section className="container mx-auto px-6 pt-32 pb-24 text-center">
                     <div className="max-w-4xl mx-auto">
                         <div className="inline-block bg-blue-50 text-brand px-4 py-1.5 rounded-full text-sm font-bold tracking-wide mb-8 border border-blue-100">
-                            CONTENTPILOT AI FOR AGENCIES & GHOSTWRITERS
+                            LINKEDIN GHOSTWRITER AI FOR AGENCIES & GHOSTWRITERS
                         </div>
                         <h1 className="font-display text-5xl md:text-6xl font-bold mb-8 leading-[1.1] tracking-tight text-gray-900">
                             Scale your agency.<br />Keep the authentic voice.
                         </h1>
                         <p className="text-xl text-gray-500 mb-12 leading-relaxed max-w-2xl mx-auto">
                             Drafting posts for 10 different clients with 10 different voices is exhausting.
-                            ContentPilot analyzes each client's unique style to generate perfect first drafts, multiplying your output without sacrificing quality.
+                            LinkedIn Ghostwriter AI analyzes each client's unique style to generate perfect first drafts, multiplying your output without sacrificing quality.
                         </p>
                         <div className="flex flex-col sm:flex-row justify-center gap-4 mb-10">
                             <Link href="/sign-up">

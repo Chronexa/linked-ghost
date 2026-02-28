@@ -80,11 +80,16 @@ export default function ConfirmProfileScreen({ onConfirm }: ConfirmProfileScreen
     }
 
     async function handleConfirm() {
-        setSubmitting(true);
-        const confirmedIds = pillars
-            .filter((p) => !removedPillarIds.includes(p.id))
-            .map((p) => p.id);
-        onConfirm(confirmedIds, removedPillarIds, selectedArchetype);
+        try {
+            setSubmitting(true);
+            const confirmedIds = pillars
+                .filter((p) => !removedPillarIds.includes(p.id))
+                .map((p) => p.id);
+            onConfirm(confirmedIds, removedPillarIds, selectedArchetype);
+        } catch (err) {
+            console.error('handleConfirm error:', err);
+            setSubmitting(false);
+        }
     }
 
     const activePillars = pillars.filter(p => !removedPillarIds.includes(p.id));

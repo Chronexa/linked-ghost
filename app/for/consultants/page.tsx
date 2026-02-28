@@ -8,8 +8,8 @@ import { Button } from '@/components/ui';
 import Link from 'next/link';
 
 export const metadata = {
-    title: 'ContentPilot AI for Consultants | Generate Inbound Leads',
-    description: 'Prove your expertise and generate highly qualified inbound leads on LinkedIn with ContentPilot.',
+    title: 'LinkedIn Ghostwriter AI for Consultants | Generate Inbound Leads',
+    description: 'Prove your expertise and generate highly qualified inbound leads on LinkedIn with LinkedIn Ghostwriter AI.',
 };
 
 export default function ConsultantsPage() {
@@ -22,13 +22,13 @@ export default function ConsultantsPage() {
                 <section className="container mx-auto px-6 pt-32 pb-24 text-center">
                     <div className="max-w-4xl mx-auto">
                         <div className="inline-block bg-blue-50 text-brand px-4 py-1.5 rounded-full text-sm font-bold tracking-wide mb-8 border border-blue-100">
-                            CONTENTPILOT AI FOR CONSULTANTS
+                            LINKEDIN GHOSTWRITER AI FOR CONSULTANTS
                         </div>
                         <h1 className="font-display text-5xl md:text-6xl font-bold mb-8 leading-[1.1] tracking-tight text-gray-900">
                             Generate inbound leads.<br />Prove your expertise.
                         </h1>
                         <p className="text-xl text-gray-500 mb-12 leading-relaxed max-w-2xl mx-auto">
-                            Your next client is already following you on LinkedIn. ContentPilot transforms your industry knowledge into daily, high-converting posts that build undeniable authority.
+                            Your next client is already following you on LinkedIn. LinkedIn Ghostwriter AI transforms your industry knowledge into daily, high-converting posts that build undeniable authority.
                         </p>
                         <div className="flex flex-col sm:flex-row justify-center gap-4 mb-10">
                             <Link href="/sign-up">

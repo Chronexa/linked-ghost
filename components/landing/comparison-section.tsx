@@ -34,7 +34,7 @@ export function ComparisonSection() {
                     <div className="grid grid-cols-4 bg-gray-50 border-b border-gray-200">
                         <div className="p-5 col-span-1"></div>
                         <div className="p-5 text-center">
-                            <div className="font-bold text-brand text-sm">ContentPilot</div>
+                            <div className="font-bold text-brand text-sm">LinkedIn Ghostwriter AI</div>
                             <div className="text-xs text-gray-400 mt-0.5">You are here</div>
                         </div>
                         <div className="p-5 text-center">

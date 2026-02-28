@@ -20,8 +20,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "ContentPilot AI - Your LinkedIn Ghostwriter That Sounds Like You",
-    template: "%s | ContentPilot AI",
+    default: "LinkedIn Ghostwriter AI - Your LinkedIn Ghostwriter That Sounds Like You",
+    template: "%s | LinkedIn Ghostwriter AI",
   },
   description: "Transform industry news, insights, and data into engaging LinkedIn posts in under 3 minutes. AI-powered content in your voice.",
   keywords: [
@@ -34,30 +34,30 @@ export const metadata: Metadata = {
     "LinkedIn posts",
     "AI copywriting",
   ],
-  authors: [{ name: "ContentPilot AI" }],
-  creator: "ContentPilot AI",
+  authors: [{ name: "LinkedIn Ghostwriter AI" }],
+  creator: "LinkedIn Ghostwriter AI",
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://contentpilot.ai",
-    siteName: "ContentPilot AI",
-    title: "ContentPilot AI - Your LinkedIn Ghostwriter That Sounds Like You",
+    url: "https://www.linkedinghostwriter-ai.com",
+    siteName: "LinkedIn Ghostwriter AI",
+    title: "LinkedIn Ghostwriter AI - Your LinkedIn Ghostwriter That Sounds Like You",
     description: "Transform industry news, insights, and data into engaging LinkedIn posts in under 3 minutes.",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "ContentPilot AI",
+        alt: "LinkedIn Ghostwriter AI",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "ContentPilot AI - Your LinkedIn Ghostwriter",
+    title: "LinkedIn Ghostwriter AI - Your LinkedIn Ghostwriter",
     description: "AI-powered LinkedIn content in your voice",
     images: ["/og-image.png"],
-    creator: "@contentpilot",
+    creator: "@linkedghostai",
   },
   robots: {
     index: true,
