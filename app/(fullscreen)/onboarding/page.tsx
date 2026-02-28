@@ -128,7 +128,7 @@ export default function OnboardingPage() {
     }
   }
 
-  // Handle profile confirmation → redirect to dashboard/draft
+  // Handle profile confirmation → redirect to dashboard immediately
   async function handleConfirm(
     confirmedPillarIds: string[],
     removedPillarIds: string[],
@@ -149,37 +149,12 @@ export default function OnboardingPage() {
 
       const data = await res.json();
 
-      // If a draft was generated in the background, poll for readiness
+      // Redirect immediately — draft generation happens in the background
+      // The user can find the draft on their dashboard when it's ready
+      toast.success('🎉 Your AI ghostwriter is ready!');
       if (data.conversationId) {
-
-        let isReady = false;
-        let attempts = 0;
-        const maxAttempts = 20; // 60 seconds max
-
-        while (!isReady && attempts < maxAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, 3000));
-          attempts++;
-
-          try {
-            const msgRes = await fetch(`/api/conversations/${data.conversationId}/messages`);
-            if (msgRes.ok) {
-              const messages = await msgRes.json();
-              if (messages && messages.length > 0) {
-                const lastMsg = messages[messages.length - 1];
-                if (lastMsg.messageType === 'draft_variants' || lastMsg.metadata?.error) {
-                  isReady = true;
-                }
-              }
-            }
-          } catch (pollErr) {
-            console.error('Polling error:', pollErr);
-          }
-        }
-
-        toast.success('🎉 Your AI ghostwriter is ready!');
-        router.push(`/drafts/${data.conversationId}`);
+        router.push('/dashboard');
       } else {
-        toast.success('🎉 Your profile is ready!');
         router.push('/dashboard');
       }
     } catch (err: any) {
