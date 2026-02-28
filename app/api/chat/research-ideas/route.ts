@@ -9,6 +9,9 @@ import { z } from 'zod';
 import { discoverTopics } from '@/lib/ai/perplexity';
 import { getPrompt, PROMPT_KEYS } from '@/lib/prompts/store';
 
+export const dynamic = 'force-dynamic';
+
+
 const researchSchema = z.object({
     conversationId: z.string().uuid(),
     pillarId: z.string().uuid().optional(),

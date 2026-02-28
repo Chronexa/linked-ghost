@@ -10,6 +10,9 @@ import { generateDraftVariants, estimateEngagement } from '@/lib/ai/generation';
 import { retry, isRetryableError } from '@/lib/utils/retry';
 import { checkUsageLimit, incrementUsage } from '@/lib/ai/usage';
 
+export const dynamic = 'force-dynamic';
+
+
 const quickPostSchema = z.object({
     idea: z.string().min(10, "Please provide at least 10 characters for your text"),
     pillarId: z.string().uuid(),

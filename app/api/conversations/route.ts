@@ -6,6 +6,9 @@ import { conversations, conversationMessages } from '@/lib/db/schema';
 import { eq, desc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
+
 // Helper to group conversations by date
 function groupConversations(items: any[]) {
     const today = new Date();

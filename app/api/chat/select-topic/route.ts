@@ -10,6 +10,9 @@ import { estimateEngagement, generateDraftVariants } from '@/lib/ai/generation';
 import { enqueueGeneration } from '@/lib/queue';
 import { canGeneratePost, incrementUsage } from '@/lib/ai/usage';
 
+export const dynamic = 'force-dynamic';
+
+
 // Export max duration to prevent serverless timeouts during fallback AI generation
 export const maxDuration = 60;
 

@@ -4,6 +4,9 @@ import { rawTopics, classifiedTopics, generatedDrafts } from '@/lib/db/schema';
 import { eq, and, gte, sql } from 'drizzle-orm';
 import { getCurrentUser } from '@/lib/auth/get-user';
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * GET /api/user/stats
  * Returns aggregated dashboard statistics in a single request

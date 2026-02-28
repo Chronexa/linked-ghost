@@ -10,6 +10,9 @@ import { generateDraftVariants, estimateEngagement } from '@/lib/ai/generation';
 import { retry, isRetryableError } from '@/lib/utils/retry';
 import { canRegenerate, incrementUsage } from '@/lib/ai/usage';
 
+export const dynamic = 'force-dynamic';
+
+
 const regenerateSchema = z.object({
     conversationId: z.string().uuid(),
     topicId: z.string().uuid(),

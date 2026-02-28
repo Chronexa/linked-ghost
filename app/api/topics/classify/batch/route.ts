@@ -14,6 +14,9 @@ import { eq, inArray } from 'drizzle-orm';
 import { classifyTopicsBatch, needsManualReview, getReviewRecommendation } from '@/lib/ai/classification';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * Request body schema
  */

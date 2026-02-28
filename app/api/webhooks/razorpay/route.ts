@@ -5,6 +5,9 @@ import { subscriptions, usageTracking } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { format } from 'date-fns';
 
+export const dynamic = 'force-dynamic';
+
+
 // ============================================================================
 // RAZORPAY WEBHOOK HANDLER
 // This is the source of truth for subscription state.

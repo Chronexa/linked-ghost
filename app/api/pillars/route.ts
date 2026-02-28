@@ -15,6 +15,9 @@ import { eq, and, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { canAddPillar } from '@/lib/ai/usage';
 
+export const dynamic = 'force-dynamic';
+
+
 // Validation schemas
 const createPillarSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name must be at most 100 characters'),

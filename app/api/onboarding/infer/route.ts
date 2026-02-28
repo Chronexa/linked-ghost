@@ -7,6 +7,9 @@ import { inferProfileData } from '@/lib/ai/inference';
 import { extractVoiceDNA } from '@/lib/ai/voice-dna';
 import { generateEmbedding } from '@/lib/ai/embeddings';
 
+export const dynamic = 'force-dynamic';
+
+
 export async function POST(req: Request) {
     try {
         const { userId } = await auth();

@@ -10,6 +10,9 @@ import { generateDraftVariants, estimateEngagement } from '@/lib/ai/generation';
 import { retry, isRetryableError } from '@/lib/utils/retry';
 import { checkUsageLimit, incrementUsage } from '@/lib/ai/usage';
 
+export const dynamic = 'force-dynamic';
+
+
 // Export max duration to prevent serverless timeouts during fallback AI generation
 export const maxDuration = 60;
 

@@ -14,6 +14,9 @@ import { eq } from 'drizzle-orm';
 import { researchTopic } from '@/lib/ai/perplexity';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * Request body schema
  */

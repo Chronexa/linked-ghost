@@ -17,6 +17,9 @@ import { profiles, pillars, voiceExamples } from '@/lib/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { triggerMagicMoment } from '@/lib/ai/magic-moment';
 
+export const dynamic = 'force-dynamic';
+
+
 export async function POST(req: Request) {
     try {
         const { userId } = await auth();

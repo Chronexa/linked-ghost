@@ -3,6 +3,9 @@ import { withAuth } from '@/lib/api/with-auth';
 import { enqueueResearch } from '@/lib/queue';
 import { responses, errors } from '@/lib/api/response';
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * POST /api/research
  * Trigger immediate research for the authenticated user

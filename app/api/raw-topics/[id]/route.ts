@@ -10,6 +10,9 @@ import { db } from '@/lib/db';
 import { rawTopics } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 
+export const dynamic = 'force-dynamic';
+
+
 export const GET = withAuth(async (req: NextRequest, { params, user }) => {
   const id = params?.id;
   if (!id) return errors.badRequest('Topic ID required');

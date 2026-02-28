@@ -13,6 +13,9 @@ import { profiles } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
+
 // Validation schema
 const updateProfileSchema = z.object({
   linkedinUrl: z.string().url('Invalid LinkedIn URL').optional().nullable(),

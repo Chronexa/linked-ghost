@@ -11,6 +11,9 @@ import { db } from '@/lib/db';
 import { generatedDrafts, pillars } from '@/lib/db/schema';
 import { eq, and, gte, sql, desc, inArray } from 'drizzle-orm';
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * GET /api/analytics
  * Returns draft counts, pillar distribution, and recent activity

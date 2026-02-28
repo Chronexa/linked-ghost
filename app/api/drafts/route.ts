@@ -13,6 +13,9 @@ import { db } from '@/lib/db';
 import { generatedDrafts, classifiedTopics, pillars } from '@/lib/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * GET /api/drafts
  * List all drafts for the user

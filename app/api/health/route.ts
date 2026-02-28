@@ -8,6 +8,9 @@ import { testConnection } from '@/lib/db';
 import { testRedisConnection } from '@/lib/redis';
 import { testOpenAIConnection } from '@/lib/ai/openai';
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * GET /api/health
  * Health check endpoint for monitoring

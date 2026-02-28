@@ -5,6 +5,9 @@ import { generatedDrafts } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { rewriteDraft } from '@/lib/ai/editing';
 
+export const dynamic = 'force-dynamic';
+
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { userId } = await auth();

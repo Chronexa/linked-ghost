@@ -13,6 +13,9 @@ import { db } from '@/lib/db';
 import { postPerformance, generatedDrafts, profiles } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
+
+export const dynamic = 'force-dynamic';
+
 import {
     classifyPerformance,
     getUserAverages,

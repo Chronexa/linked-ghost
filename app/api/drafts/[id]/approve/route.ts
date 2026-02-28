@@ -11,6 +11,9 @@ import { db } from '@/lib/db';
 import { generatedDrafts } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * POST /api/drafts/:id/approve
  * Approve a draft (marks it as ready for posting)

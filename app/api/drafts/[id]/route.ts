@@ -15,6 +15,9 @@ import { generatedDrafts, classifiedTopics, pillars } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
+
 // Validation schema – accept both fullText (client) and editedText; both map to editedText in DB
 const updateDraftSchema = z.object({
   fullText: z.string().min(50).max(3000).optional(),

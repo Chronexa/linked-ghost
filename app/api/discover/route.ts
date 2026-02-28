@@ -15,6 +15,9 @@ import { discoverTopics } from '@/lib/ai/perplexity';
 import { getPrompt, PROMPT_KEYS } from '@/lib/prompts/store';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * Request body schema
  */

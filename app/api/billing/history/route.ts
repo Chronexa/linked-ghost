@@ -6,6 +6,9 @@ import { subscriptions } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { razorpay } from '@/lib/payments/razorpay';
 
+export const dynamic = 'force-dynamic';
+
+
 // GET /api/billing/history
 // Returns the last 10 invoices/payments for the user's subscription.
 export const GET = withAuth(async (_req: NextRequest, { user }) => {

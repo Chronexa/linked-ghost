@@ -8,6 +8,9 @@ import { z } from 'zod';
 import { razorpay } from '@/lib/payments/razorpay';
 import { getPlanConfig, type PlanId, type BillingInterval } from '@/lib/config/plans.config';
 
+export const dynamic = 'force-dynamic';
+
+
 const createSubscriptionSchema = z.object({
     planId: z.enum(['starter', 'growth']),
     billingInterval: z.enum(['monthly', 'yearly']),

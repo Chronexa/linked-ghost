@@ -13,6 +13,9 @@ import { generatedDrafts } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
+
 // Validation schema
 const scheduleSchema = z.object({
   scheduledFor: z.string().datetime('Invalid datetime format'),

@@ -15,6 +15,9 @@ import { rawTopics } from '@/lib/db/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * GET /api/raw-topics
  * List raw (unclassified) topics for the user

@@ -15,6 +15,9 @@ import { classifiedTopics, generatedDrafts, pillars } from '@/lib/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
+
 // Validation schema
 const updateTopicSchema = z.object({
   pillarId: z.string().uuid().optional(),

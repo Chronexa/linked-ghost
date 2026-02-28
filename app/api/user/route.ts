@@ -11,6 +11,9 @@ import { db } from '@/lib/db';
 import { users, profiles, subscriptions, pillars, voiceExamples } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * GET /api/user
  * Get current authenticated user with profile and stats

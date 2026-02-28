@@ -14,6 +14,9 @@ import { classifiedTopics, rawTopics, pillars } from '@/lib/db/schema';
 import { eq, and, gte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
+
 // Validation schemas
 const createTopicSchema = z.object({
   content: z.string().min(50, 'Content must be at least 50 characters').max(5000, 'Content must be at most 5000 characters'),

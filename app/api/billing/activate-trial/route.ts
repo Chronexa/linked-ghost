@@ -6,6 +6,9 @@ import { subscriptions } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+
+
 const schema = z.object({
     planId: z.enum(['starter', 'growth']),
     billingInterval: z.enum(['monthly', 'yearly']),

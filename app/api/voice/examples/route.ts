@@ -17,6 +17,9 @@ import { eq, and, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { canAddVoiceExample } from '@/lib/ai/usage';
 
+export const dynamic = 'force-dynamic';
+
+
 // Validation schema – aligned with frontend (minimum 50 characters)
 const createVoiceExampleSchema = z.object({
   postText: z.string().min(50, 'Post must be at least 50 characters').max(3000, 'Post must be at most 3000 characters'),

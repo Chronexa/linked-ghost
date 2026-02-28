@@ -11,6 +11,9 @@ import { db } from '@/lib/db';
 import { voiceExamples } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * DELETE /api/voice/examples/:id
  * Delete a voice training example

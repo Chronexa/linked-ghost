@@ -13,6 +13,9 @@ import { users, profiles } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { errors, responses } from '@/lib/api/response';
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * POST /api/webhooks/clerk
  * Handle Clerk webhook events

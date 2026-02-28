@@ -11,6 +11,9 @@ import { db } from '@/lib/db';
 import { profiles, voiceExamples, pillars } from '@/lib/db/schema';
 import { eq, and, count } from 'drizzle-orm';
 
+export const dynamic = 'force-dynamic';
+
+
 export async function GET() {
     try {
         const { userId } = await auth();

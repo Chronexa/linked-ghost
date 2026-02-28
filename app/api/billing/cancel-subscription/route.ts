@@ -6,6 +6,9 @@ import { subscriptions } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { razorpay } from '@/lib/payments/razorpay';
 
+export const dynamic = 'force-dynamic';
+
+
 // POST /api/billing/cancel-subscription
 export const POST = withAuth(async (_req: NextRequest, { user }) => {
     try {

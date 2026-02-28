@@ -15,6 +15,9 @@ import { extractVoiceDNA } from '@/lib/ai/voice-dna';
 import { generatePillarsFromText } from '@/lib/ai/pillar-generator';
 import { generateEmbedding } from '@/lib/ai/embeddings';
 
+export const dynamic = 'force-dynamic';
+
+
 export async function POST(req: Request) {
     try {
         const { userId } = await auth();

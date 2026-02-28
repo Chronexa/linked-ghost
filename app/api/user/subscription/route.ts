@@ -9,6 +9,9 @@ import { responses, errors } from '@/lib/api/response';
 import { rateLimit } from '@/lib/api/rate-limit';
 import { getUsageSummary } from '@/lib/ai/usage';
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * GET /api/user/subscription
  * All plan limits and usage data come from getUsageSummary() — never hardcoded here.
