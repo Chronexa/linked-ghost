@@ -75,6 +75,6 @@ export async function enqueueLinkedInImport(userId: string, linkedinUrl: string,
     return addJob(
         QUEUE_NAMES.LINKEDIN_IMPORT,
         { userId, linkedinUrl, clerkId },
-        `linkedin-import-${userId}`
+        `linkedin-import-${userId}-${Date.now()}`
     );
 }
