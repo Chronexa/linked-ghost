@@ -65,25 +65,25 @@ const config: Config = {
         },
         // Premium Enterprise SaaS Tokens for Onboarding
         saas: {
-          background: "#0A0A0A",
+          background: "#FAFAFA",
           surface: {
-            DEFAULT: "#141414",
-            hover: "#1F1F1F",
+            DEFAULT: "#FFFFFF",
+            hover: "#F4F4F5",
           },
           border: {
-            DEFAULT: "#222222",
-            focus: "rgba(255,255,255,0.2)",
+            DEFAULT: "#E4E4E7",
+            focus: "rgba(193, 80, 46, 0.4)",
           },
           brand: {
             DEFAULT: "#C1502E",
-            dark: "#D45A34",
-            light: "#E06640",
-            glow: "rgba(193, 80, 46, 0.5)",
+            dark: "#A64020",
+            light: "#E36C4A",
+            glow: "rgba(193, 80, 46, 0.2)",
           },
           text: {
-            primary: "#EDEDED",
-            secondary: "#A1A1AA",
-            tertiary: "#71717A",
+            primary: "#09090B",
+            secondary: "#52525B",
+            tertiary: "#A1A1AA",
           }
         },
       },

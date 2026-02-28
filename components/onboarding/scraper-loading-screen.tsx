@@ -150,7 +150,7 @@ export default function ScraperLoadingScreen({ onSuccess, onFailed }: ScraperLoa
                                     delay: index * 0.15,
                                     ease: "easeOut"
                                 }}
-                                className={`relative flex items-center gap-4 px-4 py-3.5 rounded-saas-lg transition-all duration-300 ${isActive ? 'bg-white/5 shadow-saas-subtle' : ''
+                                className={`relative flex items-center gap-4 px-4 py-3.5 rounded-saas-lg transition-all duration-300 ${isActive ? 'bg-black/5 shadow-saas-subtle' : ''
                                     }`}
                             >
                                 {/* Active Accent Line */}

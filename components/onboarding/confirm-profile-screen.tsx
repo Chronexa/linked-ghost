@@ -163,7 +163,7 @@ export default function ConfirmProfileScreen({ onConfirm }: ConfirmProfileScreen
                                                 {voiceDna.toneAttributes.map((attr: string) => (
                                                     <span
                                                         key={attr}
-                                                        className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-saas-text-secondary hover:text-saas-text-primary hover:bg-white/10 transition-colors cursor-default"
+                                                        className="px-2.5 py-1 rounded-full bg-black/5 border border-black/5 text-xs text-saas-text-secondary hover:text-saas-text-primary hover:bg-black/10 transition-colors cursor-default"
                                                     >
                                                         {attr}
                                                     </span>
@@ -187,8 +187,8 @@ export default function ConfirmProfileScreen({ onConfirm }: ConfirmProfileScreen
                                                 key={archetype.id}
                                                 onClick={() => setSelectedArchetype(archetype.id)}
                                                 className={`relative text-left p-4 rounded-saas-xl border transition-all duration-200 ease-out flex flex-col items-start gap-1 overflow-hidden group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saas-border-focus ${isSelected
-                                                        ? 'bg-saas-brand/5 border-saas-brand/50 shadow-saas-glow'
-                                                        : 'bg-saas-surface border-saas-border hover:border-white/15 hover:scale-102'
+                                                    ? 'bg-saas-brand/5 border-saas-brand/50 shadow-saas-glow'
+                                                    : 'bg-saas-surface border-saas-border hover:border-saas-border-focus hover:scale-102'
                                                     }`}
                                             >
                                                 {/* Selection Checkmark */}
@@ -226,7 +226,7 @@ export default function ConfirmProfileScreen({ onConfirm }: ConfirmProfileScreen
                                 <h3 className="text-sm font-semibold text-saas-text-primary tracking-wide uppercase">
                                     Content Pillars
                                 </h3>
-                                <span className="text-xs text-saas-text-tertiary bg-white/5 px-2 py-0.5 rounded-full border border-saas-border">
+                                <span className="text-xs text-saas-text-tertiary bg-black/5 px-2 py-0.5 rounded-full border border-saas-border">
                                     {activePillars.length} Active
                                 </span>
                             </div>
@@ -240,7 +240,7 @@ export default function ConfirmProfileScreen({ onConfirm }: ConfirmProfileScreen
                                             initial={{ opacity: 0, scale: 0.95 }}
                                             animate={{ opacity: 1, scale: 1 }}
                                             exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-                                            className="group relative bg-saas-surface border border-saas-border rounded-saas-xl p-4 pr-12 transition-all hover:border-white/15 flex items-start gap-3"
+                                            className="group relative bg-saas-surface border border-saas-border rounded-saas-xl p-4 pr-12 transition-all hover:border-saas-border-focus flex items-start gap-3"
                                         >
                                             <span className="text-xl shrink-0 mt-0.5">{pillar.emoji}</span>
                                             <div className="min-w-0">
@@ -255,7 +255,7 @@ export default function ConfirmProfileScreen({ onConfirm }: ConfirmProfileScreen
                                             {/* Remove Button (Hover) */}
                                             <button
                                                 onClick={() => removePillar(pillar.id)}
-                                                className="absolute top-1/2 -translate-y-1/2 right-3 p-1.5 rounded-lg text-saas-text-tertiary opacity-0 group-hover:opacity-100 hover:bg-white/5 hover:text-saas-text-primary transition-all focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saas-border-focus"
+                                                className="absolute top-1/2 -translate-y-1/2 right-3 p-1.5 rounded-lg text-saas-text-tertiary opacity-0 group-hover:opacity-100 hover:bg-black/5 hover:text-saas-text-primary transition-all focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saas-border-focus"
                                                 title="Remove pillar"
                                             >
                                                 <X className="w-4 h-4" />
@@ -284,7 +284,7 @@ export default function ConfirmProfileScreen({ onConfirm }: ConfirmProfileScreen
                         <Button
                             onClick={handleConfirm}
                             disabled={submitting}
-                            className="w-full h-14 bg-gradient-to-b from-saas-brand-dark to-saas-brand hover:from-saas-brand-light hover:to-saas-brand-dark text-white rounded-saas-xl text-base font-semibold shadow-saas-medium hover:shadow-saas-glow hover:-translate-y-px transition-all duration-300 border border-white/10 border-b-black/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saas-border-focus"
+                            className="w-full h-14 bg-gradient-to-b from-saas-brand-dark to-saas-brand hover:from-saas-brand-light hover:to-saas-brand-dark text-white rounded-saas-xl text-base font-semibold shadow-saas-medium hover:shadow-saas-glow hover:-translate-y-px transition-all duration-300 border border-white/20 border-b-black/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saas-border-focus"
                         >
                             {submitting ? (
                                 <span className="flex items-center gap-2">

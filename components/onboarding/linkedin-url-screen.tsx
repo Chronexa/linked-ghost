@@ -51,7 +51,7 @@ export default function LinkedInUrlScreen({ onSubmitUrl, onSkip }: LinkedInUrlSc
         >
             {/* Header / Icon */}
             <div>
-                <div className="w-14 h-14 bg-gradient-to-br from-[#0077B5] to-[#0A66C2] rounded-saas-xl flex items-center justify-center text-white text-xl font-bold mx-auto mb-6 shadow-saas-medium ring-1 ring-white/10">
+                <div className="w-14 h-14 bg-gradient-to-br from-[#0077B5] to-[#0A66C2] rounded-saas-xl flex items-center justify-center text-white text-xl font-bold mx-auto mb-6 shadow-saas-medium ring-1 ring-black/5">
                     in
                 </div>
                 <h2 className="text-2xl font-semibold text-saas-text-primary tracking-tight">
@@ -86,7 +86,7 @@ export default function LinkedInUrlScreen({ onSubmitUrl, onSkip }: LinkedInUrlSc
                 <Button
                     onClick={handleSubmit}
                     disabled={loading || !url.trim()}
-                    className="w-full h-12 bg-gradient-to-b from-saas-brand-dark to-saas-brand hover:from-saas-brand-light hover:to-saas-brand-dark text-white rounded-saas-lg text-sm font-semibold shadow-saas-subtle hover:shadow-saas-glow hover:-translate-y-px transition-all duration-300 border border-white/10 border-b-black/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saas-border-focus"
+                    className="w-full h-12 bg-gradient-to-b from-saas-brand-dark to-saas-brand hover:from-saas-brand-light hover:to-saas-brand-dark text-white rounded-saas-lg text-sm font-semibold shadow-saas-subtle hover:shadow-saas-glow hover:-translate-y-px transition-all duration-300 border border-white/20 border-b-black/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saas-border-focus"
                 >
                     {loading ? (
                         <span className="flex items-center gap-2">
