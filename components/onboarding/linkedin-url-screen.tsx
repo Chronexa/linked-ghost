@@ -39,7 +39,11 @@ export default function LinkedInUrlScreen({ onSubmitUrl, onSkip }: LinkedInUrlSc
         }
 
         setLoading(true);
-        onSubmitUrl(trimmedUrl);
+        try {
+            onSubmitUrl(trimmedUrl);
+        } catch {
+            setLoading(false);
+        }
     }
 
     return (

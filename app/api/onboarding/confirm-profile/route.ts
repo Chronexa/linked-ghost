@@ -81,26 +81,30 @@ export async function POST(req: Request) {
             console.error('[ConfirmProfile] Clerk metadata update failed:', authErr);
         }
 
-        // 5. Trigger Magic Moment
-        // Get user's unique angle from profile for the first draft
-        const profile = await db.query.profiles.findFirst({
-            where: eq(profiles.userId, userId),
-        });
+        // 5. Trigger Magic Moment (NON-BLOCKING)
+        // Fire-and-forget: don't let magic moment errors block onboarding completion
+        // The draft will generate in the background via BullMQ/direct job
+        try {
+            const profile = await db.query.profiles.findFirst({
+                where: eq(profiles.userId, userId),
+            });
+            const uniqueAngle = profile?.uniqueAngle || profile?.linkedinHeadline || 'My professional perspective';
+            const userExamples = await db.query.voiceExamples.findMany({
+                where: eq(voiceExamples.userId, userId),
+                limit: 3,
+            });
+            const voiceTexts = userExamples.map((ex) => ex.postText);
 
-        const uniqueAngle = profile?.uniqueAngle || profile?.linkedinHeadline || 'My professional perspective';
-
-        // Get voice example texts for the draft
-        const userExamples = await db.query.voiceExamples.findMany({
-            where: eq(voiceExamples.userId, userId),
-            limit: 3,
-        });
-        const voiceTexts = userExamples.map((ex) => ex.postText);
-
-        const magicResult = await triggerMagicMoment(userId, uniqueAngle, voiceTexts);
+            // Fire and forget — don't await the full result
+            triggerMagicMoment(userId, uniqueAngle, voiceTexts)
+                .then((result) => console.log(`[ConfirmProfile] Magic moment result:`, result))
+                .catch((err) => console.error('[ConfirmProfile] Magic moment failed (non-blocking):', err));
+        } catch (mmErr) {
+            console.error('[ConfirmProfile] Magic moment setup failed (non-blocking):', mmErr);
+        }
 
         return NextResponse.json({
             success: true,
-            conversationId: magicResult.conversationId,
             message: 'Onboarding confirmed. Your AI ghostwriter is ready.',
         });
     } catch (error: any) {

@@ -25,8 +25,11 @@ export default function ScraperLoadingScreen({ onSuccess, onFailed }: ScraperLoa
     const startTime = useRef(Date.now());
 
     useEffect(() => {
+        let mounted = true;
+
         // Animate through steps progressively
         const stepInterval = setInterval(() => {
+            if (!mounted) return;
             setCurrentStep((prev) => {
                 if (prev < LOADING_STEPS.length - 1) return prev + 1;
                 return prev;
@@ -35,6 +38,8 @@ export default function ScraperLoadingScreen({ onSuccess, onFailed }: ScraperLoa
 
         // Poll for scraper status
         const pollInterval = setInterval(async () => {
+            if (!mounted) return;
+
             try {
                 const res = await fetch('/api/onboarding/scraper-status');
                 if (!res.ok) return;
@@ -53,7 +58,7 @@ export default function ScraperLoadingScreen({ onSuccess, onFailed }: ScraperLoa
                     return;
                 }
 
-                if (data.scraperStatus === 'failed') {
+                if (data.scraperStatus === 'failed' || data.scraperStatus === 'not_found') {
                     clearInterval(pollInterval);
                     clearInterval(stepInterval);
                     onFailed();
@@ -72,6 +77,7 @@ export default function ScraperLoadingScreen({ onSuccess, onFailed }: ScraperLoa
         }, POLL_INTERVAL);
 
         return () => {
+            mounted = false;
             clearInterval(pollInterval);
             clearInterval(stepInterval);
         };

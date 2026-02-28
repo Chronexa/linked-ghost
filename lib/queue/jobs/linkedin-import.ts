@@ -17,7 +17,7 @@
 import { Job } from 'bullmq';
 import { db } from '@/lib/db';
 import { profiles, voiceExamples, pillars } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { scrapeLinkedInPosts, scrapeLinkedInProfile } from '@/lib/apify/linkedin-scraper';
 import { extractVoiceDNAFromApify } from '@/lib/ai/voice-dna';
 import { generateContentPillars } from '@/lib/ai/pillar-generator';
@@ -68,6 +68,11 @@ export async function linkedInImportJob(job: Job<LinkedInImportJobData>): Promis
         }
 
         // ── Step 3: Store posts as voice examples ───────────────────
+        // Clean up any existing voice examples from a previous attempt
+        await db.delete(voiceExamples).where(
+            and(eq(voiceExamples.userId, userId), eq(voiceExamples.source, 'apify_scrape'))
+        );
+
         // Sort by engagement, top 3 get weight=3
         const sortedPosts = [...scrapedPosts].sort(
             (a, b) =>
@@ -98,6 +103,11 @@ export async function linkedInImportJob(job: Job<LinkedInImportJobData>): Promis
         const generatedPillars = await generateContentPillars(scrapedProfile, scrapedPosts);
 
         // Insert pillars with status='suggested'
+        // Clean up any existing suggested pillars from a previous attempt
+        await db.delete(pillars).where(
+            and(eq(pillars.userId, userId), eq(pillars.status, 'suggested'))
+        );
+
         if (generatedPillars.length > 0) {
             const pillarInserts = generatedPillars.map((pillar, index) => ({
                 userId,

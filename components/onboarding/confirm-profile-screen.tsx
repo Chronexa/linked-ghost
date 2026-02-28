@@ -15,7 +15,7 @@ interface Pillar {
 }
 
 interface ConfirmProfileScreenProps {
-    onConfirm: (confirmedPillarIds: string[], removedPillarIds: string[], archetype: string) => void;
+    onConfirm: (confirmedPillarIds: string[], removedPillarIds: string[], archetype: string) => Promise<void>;
 }
 
 const ARCHETYPES = [
@@ -80,14 +80,16 @@ export default function ConfirmProfileScreen({ onConfirm }: ConfirmProfileScreen
     }
 
     async function handleConfirm() {
+        setSubmitting(true);
         try {
-            setSubmitting(true);
             const confirmedIds = pillars
                 .filter((p) => !removedPillarIds.includes(p.id))
                 .map((p) => p.id);
-            onConfirm(confirmedIds, removedPillarIds, selectedArchetype);
+            await onConfirm(confirmedIds, removedPillarIds, selectedArchetype);
         } catch (err) {
             console.error('handleConfirm error:', err);
+            toast.error('Something went wrong. Please try again.');
+        } finally {
             setSubmitting(false);
         }
     }
@@ -211,7 +213,7 @@ export default function ConfirmProfileScreen({ onConfirm }: ConfirmProfileScreen
                                                 </AnimatePresence>
 
                                                 <span className="text-2xl mb-1">{archetype.emoji}</span>
-                                                <span className={`text-sm font-semibold transition-colors ${isSelected ? 'text-saas-text-primary' : 'text-saas-text-primary'
+                                                <span className={`text-sm font-semibold transition-colors ${isSelected ? 'text-saas-text-primary' : 'text-saas-text-secondary'
                                                     }`}>
                                                     {archetype.label}
                                                 </span>

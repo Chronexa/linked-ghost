@@ -27,7 +27,17 @@ export async function GET() {
         });
 
         if (!profile) {
-            return NextResponse.json({ status: 'error', error: 'Profile not found' }, { status: 404 });
+            // Return 200 with a status the frontend can handle — NOT 404
+            // 404 causes the polling loop to silently ignore and keep retrying forever
+            return NextResponse.json({
+                scraperStatus: 'not_found',
+                postsFound: 0,
+                pillarsGenerated: 0,
+                voiceArchetype: null,
+                voiceDna: null,
+                fullName: null,
+                linkedinHeadline: null,
+            });
         }
 
         // Count posts scraped

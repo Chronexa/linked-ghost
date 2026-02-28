@@ -66,6 +66,7 @@ export default function OnboardingPage() {
         case 'failed':
           setStep('manual');
           break;
+        case 'not_found':
         case 'skipped':
         default:
           setStep('url-input');
@@ -147,16 +148,8 @@ export default function OnboardingPage() {
 
       if (!res.ok) throw new Error('Confirmation failed');
 
-      const data = await res.json();
-
-      // Redirect immediately — draft generation happens in the background
-      // The user can find the draft on their dashboard when it's ready
       toast.success('🎉 Your AI ghostwriter is ready!');
-      if (data.conversationId) {
-        router.push('/dashboard');
-      } else {
-        router.push('/dashboard');
-      }
+      router.push('/dashboard');
     } catch (err: any) {
       toast.error(err.message || 'Something went wrong');
       router.push('/dashboard');
