@@ -134,10 +134,10 @@ async function handleUserCreated(evt: WebhookEvent) {
     userId: newUser.id,
     linkedinUrl: linkedinUrl || undefined,
     scraperStatus: linkedinUrl ? 'pending' : 'skipped',
-  });
+  }).onConflictDoNothing();
 
   // If LinkedIn URL is available, queue the Apify import job
-  if (linkedinUrl && process.env.USE_BACKGROUND_WORKER === 'true') {
+  if (linkedinUrl) {
     try {
       const { enqueueLinkedInImport } = await import('@/lib/queue');
       await enqueueLinkedInImport(newUser.id, linkedinUrl, id);

@@ -8,7 +8,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
-import { profiles, voiceExamples, pillars } from '@/lib/db/schema';
+import { profiles, users, voiceExamples, pillars } from '@/lib/db/schema';
 import { eq, and, count } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
@@ -27,10 +27,36 @@ export async function GET() {
         });
 
         if (!profile) {
-            // Return 200 with a status the frontend can handle — NOT 404
-            // 404 causes the polling loop to silently ignore and keep retrying forever
+            // Auto-create profile if missing (Clerk webhook may not have fired)
+            try {
+                // Ensure user row exists
+                const existingUser = await db.query.users.findFirst({
+                    where: eq(users.id, userId),
+                });
+                if (!existingUser) {
+                    const { currentUser } = await import('@clerk/nextjs/server');
+                    const clerkUser = await currentUser();
+                    if (clerkUser) {
+                        await db.insert(users).values({
+                            id: userId,
+                            email: clerkUser.emailAddresses[0]?.emailAddress || '',
+                            fullName: `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || null,
+                            avatarUrl: clerkUser.imageUrl || null,
+                        }).onConflictDoNothing();
+                    }
+                }
+
+                await db.insert(profiles).values({
+                    userId,
+                    scraperStatus: 'skipped',
+                }).onConflictDoNothing();
+                console.log(`[ScraperStatus] Auto-created profile for ${userId}`);
+            } catch (createErr) {
+                console.error('[ScraperStatus] Failed to auto-create profile:', createErr);
+            }
+
             return NextResponse.json({
-                scraperStatus: 'not_found',
+                scraperStatus: 'skipped',
                 postsFound: 0,
                 pillarsGenerated: 0,
                 voiceArchetype: null,

@@ -13,7 +13,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
-import { profiles } from '@/lib/db/schema';
+import { profiles, users } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
@@ -42,12 +42,44 @@ export async function POST(req: Request) {
             return new NextResponse('Invalid or missing LinkedIn URL', { status: 400 });
         }
 
-        // Save URL and set status to running
-        await db.update(profiles).set({
+        // Ensure user row exists (Clerk webhook may not have fired on live)
+        try {
+            const existingUser = await db.query.users.findFirst({
+                where: eq(users.id, userId),
+            });
+            if (!existingUser) {
+                const { currentUser } = await import('@clerk/nextjs/server');
+                const clerkUser = await currentUser();
+                if (clerkUser) {
+                    await db.insert(users).values({
+                        id: userId,
+                        email: clerkUser.emailAddresses[0]?.emailAddress || '',
+                        fullName: `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || null,
+                        avatarUrl: clerkUser.imageUrl || null,
+                    }).onConflictDoNothing();
+                    console.log(`[StartScraping] Auto-created user row for ${userId}`);
+                }
+            }
+        } catch (syncErr) {
+            console.error('[StartScraping] User sync failed (non-fatal):', syncErr);
+        }
+
+        // UPSERT profile: create if missing, update if exists
+        // This is critical — the Clerk webhook may not have fired, so the profile may not exist
+        await db.insert(profiles).values({
+            userId,
             linkedinUrl,
             scraperStatus: 'running',
             updatedAt: new Date(),
-        }).where(eq(profiles.userId, userId));
+        }).onConflictDoUpdate({
+            target: profiles.userId,
+            set: {
+                linkedinUrl,
+                scraperStatus: 'running',
+                updatedAt: new Date(),
+            },
+        });
+        console.log(`[StartScraping] Profile upserted for ${userId} with scraperStatus=running`);
 
         let enqueuedToBullMQ = false;
 
