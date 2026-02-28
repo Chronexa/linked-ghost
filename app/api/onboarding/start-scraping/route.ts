@@ -62,15 +62,13 @@ export async function POST(req: Request) {
             console.error('[StartScraping] Failed to fire direct job:', err);
         }
 
-        // Also enqueue to BullMQ if worker is running (for production scalability)
-        if (process.env.USE_BACKGROUND_WORKER === 'true') {
-            try {
-                const { enqueueLinkedInImport } = await import('@/lib/queue');
-                await enqueueLinkedInImport(userId, linkedinUrl, userId);
-                console.log(`[StartScraping] Also queued to BullMQ for ${userId}`);
-            } catch (err) {
-                console.error('[StartScraping] BullMQ enqueue failed (non-fatal):', err);
-            }
+        // Attempt to enqueue to BullMQ for reliable background processing on Railway
+        try {
+            const { enqueueLinkedInImport } = await import('@/lib/queue');
+            await enqueueLinkedInImport(userId, linkedinUrl, userId);
+            console.log(`[StartScraping] Successfully queued to BullMQ for Railway worker: ${userId}`);
+        } catch (err) {
+            console.error('[StartScraping] BullMQ enqueue failed (falling back to direct Vercel execution):', err);
         }
 
         return NextResponse.json({ success: true, message: 'Scraping started' });

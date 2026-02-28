@@ -10,7 +10,7 @@ interface ScraperLoadingScreenProps {
 }
 
 const POLL_INTERVAL = 2000;
-const MAX_WAIT = 35000;
+const MAX_WAIT = 150000;
 
 const LOADING_STEPS = [
     { id: 'scrape', label: 'Scanning your LinkedIn posts', icon: Search },
@@ -31,7 +31,7 @@ export default function ScraperLoadingScreen({ onSuccess, onFailed }: ScraperLoa
                 if (prev < LOADING_STEPS.length - 1) return prev + 1;
                 return prev;
             });
-        }, 5000);
+        }, 12000);
 
         // Poll for scraper status
         const pollInterval = setInterval(async () => {
