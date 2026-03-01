@@ -65,6 +65,7 @@ export interface ApifyProfile {
             end?: { month: number; year: number } | null;
         };
     }>;
+    skills?: any[];
     profilePicture?: {
         url: string;
     };

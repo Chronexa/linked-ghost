@@ -62,6 +62,14 @@ export interface VoiceDNA {
     analysisNotes?: string;
     /** Confidence score 0-100 based on number of posts analyzed */
     confidenceScore?: number;
+
+    // ── New Enriched Profile Fields ──
+    /** Inferred industry based on posts and profile */
+    industry?: string;
+    /** Short 1-2 sentence career highlight summary */
+    careerHighlights?: string;
+    /** Inferred audience/network composition (e.g. ['Founders', 'Investors']) */
+    networkComposition?: string[];
 }
 
 // ============================================================================
@@ -186,18 +194,19 @@ export async function extractVoiceDNA(postTexts: string[]): Promise<VoiceDNA> {
 // APIFY-POWERED EXTRACTION (with engagement weighting)
 // ============================================================================
 
-import type { ApifyPost } from '@/lib/apify/linkedin-scraper';
+import type { ApifyPost, ApifyProfile } from '@/lib/apify/linkedin-scraper';
 
 /**
- * Extract Voice DNA from Apify-scraped posts with engagement weighting.
+ * Extract Voice DNA from Apify-scraped posts and profile with engagement weighting.
  * Top 3 posts by engagement are weighted 3x more heavily in the analysis.
+ * Also infers industry, career highlights, and network composition from the profile + posts.
  */
-export async function extractVoiceDNAFromApify(posts: ApifyPost[]): Promise<VoiceDNA> {
+export async function extractVoiceDNAFromApify(posts: ApifyPost[], profile: ApifyProfile | null = null): Promise<VoiceDNA> {
     if (posts.length === 0) {
         throw new Error('No posts provided for Voice DNA extraction');
     }
 
-    console.log(`🧬 Extracting Voice DNA from ${posts.length} Apify posts (engagement-weighted)...`);
+    console.log(`🧬 Extracting Voice DNA from ${posts.length} Apify posts (engagement-weighted) + profile...`);
 
     // Sort by total engagement descending
     const sortedPosts = [...posts].sort(
@@ -222,7 +231,12 @@ export async function extractVoiceDNAFromApify(posts: ApifyPost[]): Promise<Voic
         });
     }
 
-    const extendedPrompt = `Analyze the following LinkedIn posts from a single author. Extract their Voice DNA.\n\nIMPORTANT: Weight the top performing posts 3x more heavily when making judgments.\n\n${postsContext}\n\nReturn a JSON object with this EXACT structure:\n{\n  "avgSentenceLength": <number>,\n  "vocabularyLevel": "<'simple' | 'moderate' | 'technical'>",\n  "signaturePhrases": ["<recurring expressions, max 10>"],\n  "structuralPatterns": {\n    "usesLists": <boolean>,\n    "usesStories": <boolean>,\n    "usesData": <boolean>,\n    "usesQuestions": <boolean>,\n    "usesOneLiners": <boolean>\n  },\n  "emotionalTone": "<2-5 word description>",\n  "openingStyle": "<how they typically start posts>",\n  "closingStyle": "<how they typically end posts>",\n  "avgParagraphLength": <number>,\n  "formattingPreferences": {\n    "usesEmojis": <boolean>,\n    "usesBoldText": <boolean>,\n    "usesHashtags": <boolean>,\n    "avgHashtagCount": <number>\n  },\n  "voicePersonality": "<1-2 sentence summary>",\n  "dominantHookType": "<'number' | 'story' | 'contrarian' | 'question' | 'bold' | 'relatable'>",\n  "detectedArchetype": "<'expert' | 'storyteller' | 'contrarian' | 'educator'>",\n  "toneAttributes": ["<3-5 tone keywords, e.g. 'data-driven', 'authoritative'>"],\n  "hookExamples": ["<actual first lines from top 3 posts, copy verbatim>"],\n  "ctaPattern": "<'question' | 'statement' | 'call-to-action' | 'none'>",\n  "analysisNotes": "<1-2 sentence plain English description of this person's writing style>",\n  "confidenceScore": <number 0-100: 10 posts=85, 5 posts=65, 2 posts=40, 1 post=25>\n}\n\nReturn ONLY valid JSON.`;
+    let profileContext = '';
+    if (profile) {
+        profileContext = `\nAUTHOR PROFILE CONTEXT:\nHeadline: ${profile.headline || 'Unknown'}\nAbout: ${profile.about || 'Unknown'}\nCurrent Role: ${profile.currentPosition?.[0]?.companyName || 'Unknown'}\n`;
+    }
+
+    const extendedPrompt = `Analyze the following LinkedIn posts and profile from a single author. Extract their Voice DNA and infer their professional positioning.\n\nIMPORTANT: Weight the top performing posts 3x more heavily when making judgments.${profileContext}\n\n${postsContext}\n\nReturn a JSON object with this EXACT structure:\n{\n  "avgSentenceLength": <number>,\n  "vocabularyLevel": "<'simple' | 'moderate' | 'technical'>",\n  "signaturePhrases": ["<recurring expressions, max 10>"],\n  "structuralPatterns": {\n    "usesLists": <boolean>,\n    "usesStories": <boolean>,\n    "usesData": <boolean>,\n    "usesQuestions": <boolean>,\n    "usesOneLiners": <boolean>\n  },\n  "emotionalTone": "<2-5 word description>",\n  "openingStyle": "<how they typically start posts>",\n  "closingStyle": "<how they typically end posts>",\n  "avgParagraphLength": <number>,\n  "formattingPreferences": {\n    "usesEmojis": <boolean>,\n    "usesBoldText": <boolean>,\n    "usesHashtags": <boolean>,\n    "avgHashtagCount": <number>\n  },\n  "voicePersonality": "<1-2 sentence summary>",\n  "dominantHookType": "<'number' | 'story' | 'contrarian' | 'question' | 'bold' | 'relatable'>",\n  "detectedArchetype": "<'expert' | 'storyteller' | 'contrarian' | 'educator'>",\n  "toneAttributes": ["<3-5 tone keywords, e.g. 'data-driven', 'authoritative'>"],\n  "hookExamples": ["<actual first lines from top 3 posts, copy verbatim>"],\n  "ctaPattern": "<'question' | 'statement' | 'call-to-action' | 'none'>",\n  "analysisNotes": "<1-2 sentence plain English description of this person's writing style>",\n  "confidenceScore": <number 0-100: 10 posts=85, 5 posts=65, 2 posts=40, 1 post=25>,\n  "industry": "<1-3 words inferred from profile/posts e.g. 'B2B SaaS'>",\n  "careerHighlights": "<1-2 sentence summary of their career traction/notable experience>",\n  "networkComposition": ["<1-2 word role description of people who likely read their posts, e.g. 'Founders', 'Engineers', max 3>"]\n}\n\nReturn ONLY valid JSON.`;
 
     const response = await openai.chat.completions.create({
         model: DEFAULT_CONFIG.generation.model,
@@ -275,6 +289,9 @@ export async function extractVoiceDNAFromApify(posts: ApifyPost[]): Promise<Voic
         ctaPattern: parsed.ctaPattern || 'question',
         analysisNotes: parsed.analysisNotes || '',
         confidenceScore: typeof parsed.confidenceScore === 'number' ? parsed.confidenceScore : 50,
+        industry: parsed.industry || '',
+        careerHighlights: parsed.careerHighlights || '',
+        networkComposition: Array.isArray(parsed.networkComposition) ? parsed.networkComposition.slice(0, 3) : [],
     };
 
     console.log(`✅ Apify Voice DNA extracted: archetype=${voiceDNA.detectedArchetype}, hook=${voiceDNA.dominantHookType}, confidence=${voiceDNA.confidenceScore}`);

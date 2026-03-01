@@ -57,7 +57,7 @@ export default function ConfirmProfileScreen({ onConfirm }: ConfirmProfileScreen
             const pillarsRes = await fetch('/api/pillars');
             if (pillarsRes.ok) {
                 const pillarsData = await pillarsRes.json();
-                const suggestedPillars = (pillarsData.pillars || pillarsData || [])
+                const suggestedPillars = (pillarsData.data || pillarsData.pillars || pillarsData || [])
                     .filter((p: any) => p.status === 'suggested')
                     .map((p: any) => ({
                         id: p.id,

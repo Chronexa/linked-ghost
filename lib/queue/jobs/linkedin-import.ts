@@ -95,8 +95,8 @@ export async function linkedInImportJob(job: Job<LinkedInImportJobData>): Promis
         await db.insert(voiceExamples).values(voiceExampleInserts);
         console.log(`[LinkedIn Import] ${voiceExampleInserts.length} voice examples stored`);
 
-        // ── Step 4: Extract Voice DNA (engagement-weighted) ─────────
-        const voiceDNA = await extractVoiceDNAFromApify(scrapedPosts);
+        // ── Step 4: Extract Voice DNA (engagement-weighted) + Profile Positioning ─────────
+        const voiceDNA = await extractVoiceDNAFromApify(scrapedPosts, scrapedProfile);
         const embedding = await generateEmbedding(JSON.stringify(voiceDNA));
 
         // ── Step 5: Auto-generate content pillars ───────────────────
@@ -148,6 +148,49 @@ export async function linkedInImportJob(job: Job<LinkedInImportJobData>): Promis
             profileUpdate.currentRole = scrapedProfile.headline?.split(' | ')[0]?.split(' - ')[0] || null;
             profileUpdate.companyName = scrapedProfile.currentPosition?.[0]?.companyName || null;
             profileUpdate.location = scrapedProfile.location?.linkedinText || null;
+
+            // ── Enrichment Fields ──
+            profileUpdate.industry = voiceDNA.industry || null;
+            profileUpdate.careerHighlights = voiceDNA.careerHighlights || null;
+            profileUpdate.networkComposition = voiceDNA.networkComposition || [];
+
+            // Extract Skills directly from Apify
+            if (scrapedProfile.skills && Array.isArray(scrapedProfile.skills)) {
+                const mappedSkills = scrapedProfile.skills
+                    .map((s: any) => typeof s === 'string' ? s : (s.name || s.title || s.skillName))
+                    .filter(Boolean)
+                    .slice(0, 5);
+
+                if (mappedSkills.length > 0) {
+                    profileUpdate.keyExpertise = mappedSkills;
+                }
+            }
+
+            // Extract Years of Experience
+            if (scrapedProfile.currentPosition && scrapedProfile.currentPosition.length > 0) {
+                let earliestYear = new Date().getFullYear();
+                let foundYear = false;
+
+                for (const pos of scrapedProfile.currentPosition) {
+                    if (pos.dateRange?.start?.year) {
+                        if (pos.dateRange.start.year < earliestYear) {
+                            earliestYear = pos.dateRange.start.year;
+                            foundYear = true;
+                        }
+                    }
+                }
+
+                if (foundYear) {
+                    const currentYear = new Date().getFullYear();
+                    const years = Math.max(0, currentYear - earliestYear);
+
+                    if (years <= 2) profileUpdate.yearsOfExperience = '0-2';
+                    else if (years <= 5) profileUpdate.yearsOfExperience = '3-5';
+                    else if (years <= 10) profileUpdate.yearsOfExperience = '6-10';
+                    else if (years <= 15) profileUpdate.yearsOfExperience = '11-15';
+                    else profileUpdate.yearsOfExperience = '15+';
+                }
+            }
         }
 
         await db.update(profiles).set(profileUpdate).where(eq(profiles.userId, userId));

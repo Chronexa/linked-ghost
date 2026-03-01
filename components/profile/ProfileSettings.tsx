@@ -40,7 +40,7 @@ export function ProfileSettings() {
                 careerHighlights: profile.careerHighlights || '',
                 currentResponsibilities: profile.currentResponsibilities || '',
                 about: profile.about || '',
-                howYouWantToBeSeen: profile.howYouWantToBeSeen || '',
+                howYouWantToBeSeen: profile.voiceArchetype || profile.howYouWantToBeSeen || '',
                 uniqueAngle: profile.uniqueAngle || '',
                 currentConnections: profile.currentConnections || '',
                 targetConnections: profile.targetConnections || '',
@@ -59,6 +59,7 @@ export function ProfileSettings() {
         try {
             await updateProfile.mutateAsync({
                 ...formData,
+                voiceArchetype: formData.howYouWantToBeSeen, // explicitly link the UI state to the DB schema
                 currentConnections: Number(formData.currentConnections) || 0,
                 targetConnections: Number(formData.targetConnections) || 0,
             });
