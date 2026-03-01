@@ -176,6 +176,12 @@ export default function OnboardingPage() {
       });
 
       toast.success('🎉 Your AI ghostwriter is ready!');
+      // CRITICAL: refresh() forces Next.js to re-fetch the Clerk JWT, picking up
+      // the onboardingComplete=true metadata we just set. Without this, the JWT is
+      // stale for up to 60s and middleware redirects back to /trial/start every time.
+      router.refresh();
+      // Small delay gives the refresh a moment to complete before navigating
+      await new Promise((resolve) => setTimeout(resolve, 300));
       router.push('/dashboard');
     } catch (err: any) {
       toast.error(err.message || 'Something went wrong');

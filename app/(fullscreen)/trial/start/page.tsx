@@ -40,6 +40,11 @@ export default function TrialStartPage() {
         } catch (error) {
             console.error('Failed to set onboarding complete flag', error);
         } finally {
+            // CRITICAL: refresh() forces Next.js to re-fetch the Clerk JWT so that
+            // the onboardingComplete=true metadata is picked up by middleware.
+            // Without this, middleware loops back to /trial/start.
+            router.refresh();
+            await new Promise((resolve) => setTimeout(resolve, 300));
             router.push('/dashboard');
         }
     };

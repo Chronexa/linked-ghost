@@ -77,9 +77,12 @@ export default clerkMiddleware(async (auth, req) => {
   if (!isOnboardingPath) {
     const onboardingComplete = (session.sessionClaims?.metadata as any)?.onboardingComplete;
     if (!onboardingComplete) {
-      // New user — send them to trial start
-      const trialUrl = new URL('/trial/start', req.url);
-      return NextResponse.redirect(trialUrl);
+      // JWT onboardingComplete is falsy — but the JWT can be STALE for up to 60s
+      // after Clerk metadata update. Route through the DB-backed check endpoint
+      // which will redirect to /trial/start, /onboarding, or the destination as appropriate.
+      const checkUrl = new URL('/api/auth/onboarding-status', req.url);
+      checkUrl.searchParams.set('redirect', req.nextUrl.pathname + req.nextUrl.search);
+      return NextResponse.redirect(checkUrl);
     }
   }
 
