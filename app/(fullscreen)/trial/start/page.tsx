@@ -22,7 +22,9 @@ export default function TrialStartPage() {
     const [animStep, setAnimStep] = useState(0); // Controls staggered animations
     const [showSkip, setShowSkip] = useState(false);
     const [isSkipping, setIsSkipping] = useState(false);
-    const trialEndDate = addDays(new Date(), 7);
+    // trialEndDate must be in state (not computed at render) to avoid hydration mismatch.
+    // new Date() on the server and client produce different values if any time passes.
+    const [trialEndDate, setTrialEndDate] = useState<Date | null>(null);
 
     const handleSkip = async () => {
         if (isSkipping) return;
@@ -83,6 +85,7 @@ export default function TrialStartPage() {
 
         setPlanId(pId);
         setBilling(bInt);
+        setTrialEndDate(addDays(new Date(), 7)); // Set client-side only to avoid hydration mismatch
 
         // Link backend trial state
         activateFreeTrial(pId, bInt);
@@ -107,7 +110,7 @@ export default function TrialStartPage() {
         `${plan.limits.postsPerMonth} AI-generated posts per month`,
         `${plan.limits.pillars} content pillars for topic organization`,
         'No charges for the first 7 days',
-        `Cancel anytime before ${format(trialEndDate, 'MMM d')}`,
+        `Cancel anytime before ${trialEndDate ? format(trialEndDate, 'MMM d') : '...'}`,
     ];
 
     return (
@@ -187,7 +190,7 @@ export default function TrialStartPage() {
                 >
                     <p className="text-white/40 text-sm mb-1">Trial ends</p>
                     <p className="text-2xl font-semibold text-white">
-                        {format(trialEndDate, 'MMMM d, yyyy')}
+                        {trialEndDate ? format(trialEndDate, 'MMMM d, yyyy') : '7 days from now'}
                     </p>
                 </div>
 
