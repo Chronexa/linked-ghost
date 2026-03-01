@@ -10,6 +10,7 @@ import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { profiles, users, voiceExamples, pillars } from '@/lib/db/schema';
 import { eq, and, count } from 'drizzle-orm';
+import { ensureUserExists } from '@/lib/api/ensure-user';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,21 +30,13 @@ export async function GET() {
         if (!profile) {
             // Auto-create profile if missing (Clerk webhook may not have fired)
             try {
-                // Ensure user row exists
-                const existingUser = await db.query.users.findFirst({
-                    where: eq(users.id, userId),
-                });
-                if (!existingUser) {
-                    const { currentUser } = await import('@clerk/nextjs/server');
-                    const clerkUser = await currentUser();
-                    if (clerkUser) {
-                        await db.insert(users).values({
-                            id: userId,
-                            email: clerkUser.emailAddresses[0]?.emailAddress || '',
-                            fullName: `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || null,
-                            avatarUrl: clerkUser.imageUrl || null,
-                        }).onConflictDoNothing();
-                    }
+                // Ensure user row exists first — handles the case where:
+                // (a) Clerk webhook didn't fire on localhost
+                // (b) User deleted account and re-registered with same email (new Clerk ID)
+                const userCreated = await ensureUserExists(userId);
+                if (!userCreated) {
+                    console.error(`[ScraperStatus] Cannot create profile — user row missing for ${userId}`);
+                    return NextResponse.json({ scraperStatus: 'skipped', postsFound: 0, pillarsGenerated: 0, voiceArchetype: null, voiceDna: null, fullName: null, linkedinHeadline: null });
                 }
 
                 await db.insert(profiles).values({

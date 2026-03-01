@@ -14,6 +14,7 @@ import { eq } from 'drizzle-orm';
 import { extractVoiceDNA } from '@/lib/ai/voice-dna';
 import { generatePillarsFromText } from '@/lib/ai/pillar-generator';
 import { generateEmbedding } from '@/lib/ai/embeddings';
+import { ensureUserExists } from '@/lib/api/ensure-user';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,17 @@ export async function POST(req: Request) {
         }
 
         console.log(`[Manual Voice] Analyzing ${validPosts.length} posts for user ${userId}`);
+
+        // Ensure user + profile rows exist before inserting FK-constrained data
+        const userOk = await ensureUserExists(userId);
+        if (!userOk) {
+            return new NextResponse('Failed to create user record. Please sign out and back in.', { status: 500 });
+        }
+        // Upsert profile (may not exist if Clerk webhook didn't fire)
+        await db.insert(profiles).values({
+            userId,
+            scraperStatus: 'skipped',
+        }).onConflictDoNothing();
 
         // 1. Extract Voice DNA
         const voiceDNA = await extractVoiceDNA(validPosts);

@@ -1,14 +1,13 @@
 /**
  * GET /api/auth/onboarding-status
  * ─────────────────────────────────────────────────────────────────
- * This route is used by the middleware as the SINGLE source of truth for
- * onboarding completion. The middleware reads `onboardingComplete` from the
- * JWT (sessionClaims), but the JWT can be stale for up to 60 seconds after
- * Clerk metadata is updated. This route bypasses the JWT by checking the DB
- * directly, and redirects to the right destination.
+ * DB-backed onboarding check. The middleware routes through here
+ * when the JWT is stale (onboardingComplete not yet reflected).
  *
- * Called from: middleware.ts when JWT onboardingComplete is falsy
- * Returns: 302 redirect to /trial/start, /onboarding, or /dashboard
+ * CRITICAL: When the user IS done, this endpoint sets a
+ * __cp_onboarding_done=1 cookie (5-minute TTL) in the redirect response.
+ * The middleware reads this cookie at Layer 1 on all subsequent requests —
+ * this breaks the infinite redirect loop caused by stale JWTs.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -23,52 +22,58 @@ export async function GET(req: NextRequest) {
     try {
         const { userId } = await auth();
         if (!userId) {
-            const signInUrl = new URL('/sign-in', req.url);
-            return NextResponse.redirect(signInUrl);
+            return NextResponse.redirect(new URL('/sign-in', req.url));
         }
 
         const redirectTo = req.nextUrl.searchParams.get('redirect') || '/dashboard';
+        // Safety: never redirect back to this endpoint (loop prevention)
+        const safeRedirect = redirectTo.startsWith('/api/auth/onboarding-status')
+            ? '/dashboard'
+            : redirectTo;
 
-        // Check DB profile for onboarding completion
+        // Check DB directly — bypasses stale JWT
         const profile = await db.query.profiles.findFirst({
             where: eq(profiles.userId, userId),
-            columns: {
-                onboardingCompletedAt: true,
-                scraperStatus: true,
-            },
+            columns: { onboardingCompletedAt: true },
         });
 
         const isOnboardingComplete = !!profile?.onboardingCompletedAt;
 
         if (isOnboardingComplete) {
-            // Update Clerk metadata so the JWT will be fresh next time
-            // (fire-and-forget, don't await)
+            // Heal Clerk metadata fire-and-forget (so JWT refreshes next time)
             try {
                 const client = await clerkClient();
                 client.users.updateUserMetadata(userId, {
                     publicMetadata: { onboardingComplete: true },
-                }).catch((err) => console.error('[onboarding-status] Clerk metadata update failed:', err));
-            } catch {
-                // Non-fatal
-            }
+                }).catch(() => { });
+            } catch { /* non-fatal */ }
 
-            console.log(`[onboarding-status] User ${userId} has completed onboarding → redirecting to ${redirectTo}`);
-            return NextResponse.redirect(new URL(redirectTo, req.url));
+            console.log(`[onboarding-status] User ${userId} done → redirecting to ${safeRedirect}`);
+
+            // Set the __cp_onboarding_done cookie so middleware lets through
+            // on the very next request (breaks the infinite redirect loop).
+            const response = NextResponse.redirect(new URL(safeRedirect, req.url));
+            response.cookies.set('__cp_onboarding_done', '1', {
+                httpOnly: true,
+                sameSite: 'lax',
+                maxAge: 300, // 5 minutes — long enough to survive JWT staleness window
+                path: '/',
+            });
+            return response;
         }
 
-        // Not complete — check if they have started (has a profile) → onboarding
         if (profile) {
-            console.log(`[onboarding-status] User ${userId} has profile but not complete → /onboarding`);
+            // Has a profile but not complete → send to onboarding
+            console.log(`[onboarding-status] User ${userId} has profile, not complete → /onboarding`);
             return NextResponse.redirect(new URL('/onboarding', req.url));
         }
 
-        // No profile at all → trial/start (brand new user)
+        // No profile at all → brand new user → trial/start
         console.log(`[onboarding-status] User ${userId} has no profile → /trial/start`);
         return NextResponse.redirect(new URL('/trial/start', req.url));
 
     } catch (error: any) {
         console.error('[onboarding-status] Error:', error);
-        // Safe fallback
         return NextResponse.redirect(new URL('/trial/start', req.url));
     }
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@clerk/nextjs';
 import { toast } from 'sonner';
 import { usePostHog } from 'posthog-js/react';
 
@@ -28,6 +29,7 @@ type OnboardingStep = 'loading' | 'checking' | 'url-input' | 'scraping' | 'confi
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { getToken } = useAuth();
   const [step, setStep] = useState<OnboardingStep>('checking');
   const posthog = usePostHog();
   const startedAt = useRef(Date.now());
@@ -176,16 +178,13 @@ export default function OnboardingPage() {
       });
 
       toast.success('🎉 Your AI ghostwriter is ready!');
-      // CRITICAL: refresh() forces Next.js to re-fetch the Clerk JWT, picking up
-      // the onboardingComplete=true metadata we just set. Without this, the JWT is
-      // stale for up to 60s and middleware redirects back to /trial/start every time.
-      router.refresh();
-      // Small delay gives the refresh a moment to complete before navigating
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      router.push('/dashboard');
+      // Use a hard navigation (not router.push) so the browser sends a fresh
+      // HTTP request with Clerk's updated session cookie — middleware then
+      // sees the __cp_onboarding_done cookie from onboarding-status and lets through.
+      window.location.href = '/dashboard';
     } catch (err: any) {
       toast.error(err.message || 'Something went wrong');
-      router.push('/dashboard');
+      window.location.href = '/dashboard';
     }
   }
 

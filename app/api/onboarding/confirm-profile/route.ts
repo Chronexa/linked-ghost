@@ -16,6 +16,7 @@ import { db } from '@/lib/db';
 import { profiles, pillars, voiceExamples } from '@/lib/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { triggerMagicMoment } from '@/lib/ai/magic-moment';
+import { ensureUserExists } from '@/lib/api/ensure-user';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,13 @@ export async function POST(req: Request) {
         if (!userId) {
             return new NextResponse('Unauthorized', { status: 401 });
         }
+
+        // Ensure user + profile exist (handles local dev where Clerk webhook doesn't fire)
+        await ensureUserExists(userId);
+        await db.insert(profiles).values({
+            userId,
+            scraperStatus: 'skipped',
+        }).onConflictDoNothing();
 
         const body = await req.json();
         const {

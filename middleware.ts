@@ -3,44 +3,43 @@ import { NextResponse } from 'next/server';
 
 /**
  * Clerk Authentication Middleware
- * - Protects all routes except public pages
- * - Detects NEW users via Clerk publicMetadata.onboardingComplete flag
- * - Redirects new users → /trial/start regardless of signup method (email, Google, etc.)
- * - Detects cp_selected_plan cookie after sign-up → redirects signed-in users to /trial/start
+ *
+ * Onboarding redirect logic (loop-proof):
+ * ─────────────────────────────────────────────────────
+ * Problem: Clerk JWT caches onboardingComplete for ~60s after Clerk metadata
+ * update. Redirecting through a DB-check API endpoint creates an infinite loop:
+ *   /dashboard → /api/auth/onboarding-status?redirect=/dashboard → db says done
+ *   → redirect /dashboard → middleware catches it → /api/auth/onboarding-status
+ *   → INFINITE LOOP
+ *
+ * Solution: Two-layer check:
+ *   Layer 1 (fast path): Check __cp_onboarding_done cookie.
+ *     This cookie is set by /api/auth/onboarding-status when DB confirms done.
+ *     If cookie present → let through immediately (no DB, no JWT needed).
+ *   Layer 2 (when cookie absent): Check JWT sessionClaims.
+ *     If JWT says not complete → redirect to /api/auth/onboarding-status
+ *     which checks DB, sets the cookie, then redirects back.
+ *
+ * The cookie breaks the loop: once set, subsequent requests to /dashboard
+ * pass Layer 1 and never hit Layer 2 again (until the 5-minute cookie expires,
+ * by which time Clerk's JWT has refreshed with onboardingComplete: true).
  */
 
-// Define public routes that don't require authentication
-// ⚠️ IMPORTANT: All marketing/SEO pages must be listed here or Clerk will redirect to sign-in
 const isPublicRoute = createRouteMatcher([
-  // Core marketing pages
   '/',
   '/pricing',
   '/about',
-
-  // Auth pages
   '/sign-in(.*)',
   '/sign-up(.*)',
-
-  // Persona / use-case landing pages
   '/for(.*)',
-
-  // Feature deep-dive pages
   '/features(.*)',
-
-  // Content marketing & resources
   '/guides(.*)',
   '/changelog(.*)',
   '/blog(.*)',
   '/alternatives(.*)',
-
-  // SEO
   '/sitemap.xml',
   '/robots.txt',
-
-  // Legal
   '/legal(.*)',
-
-  // API public routes
   '/api/webhooks(.*)',
   '/api/cron(.*)',
   '/api/health',
@@ -52,21 +51,18 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.next();
   }
 
-  // Protect all other routes - require authentication
+  // Protect all other routes — require authentication
   const session = await auth();
   const userId = session.userId;
 
   if (!userId) {
-    // Redirect to sign-in if not authenticated
     const signInUrl = new URL('/sign-in', req.url);
     signInUrl.searchParams.set('redirect_url', req.url);
     return NextResponse.redirect(signInUrl);
   }
 
-  // ── New User Detection ────────────────────────────────────────────────────
-  // If the user hasn't completed onboarding (publicMetadata.onboardingComplete !== true),
-  // redirect them to /trial/start — this catches ALL signup methods (Google, email, etc.)
-  // Skip this check if they are already on onboarding-related paths to avoid loops
+  // ── Onboarding Guard ─────────────────────────────────────────────────────
+  // API routes, onboarding pages, and trial pages are exempt
   const isOnboardingPath =
     req.nextUrl.pathname.startsWith('/trial') ||
     req.nextUrl.pathname.startsWith('/onboarding') ||
@@ -75,28 +71,34 @@ export default clerkMiddleware(async (auth, req) => {
     req.nextUrl.pathname.startsWith('/api');
 
   if (!isOnboardingPath) {
+    // Layer 1: __cp_onboarding_done cookie set by /api/auth/onboarding-status
+    // when DB confirms the user has completed onboarding. This cookie breaks
+    // the infinite redirect loop caused by stale JWTs.
+    const doneCookie = req.cookies.get('__cp_onboarding_done')?.value;
+    if (doneCookie === '1') {
+      // Cookie present — user confirmed done by DB check. Let through.
+      return NextResponse.next();
+    }
+
+    // Layer 2: Check JWT claims
     const onboardingComplete = (session.sessionClaims?.metadata as any)?.onboardingComplete;
     if (!onboardingComplete) {
-      // JWT onboardingComplete is falsy — but the JWT can be STALE for up to 60s
-      // after Clerk metadata update. Route through the DB-backed check endpoint
-      // which will redirect to /trial/start, /onboarding, or the destination as appropriate.
+      // JWT says not complete (may be stale). Route through DB-backed check.
+      // That endpoint will set the __cp_onboarding_done cookie if done,
+      // OR redirect to /trial/start if they haven't started.
       const checkUrl = new URL('/api/auth/onboarding-status', req.url);
       checkUrl.searchParams.set('redirect', req.nextUrl.pathname + req.nextUrl.search);
       return NextResponse.redirect(checkUrl);
     }
   }
 
-  // ── Existing Signed-in User Plan Cookie Check ─────────────────────────────
-  // If signed-in user has a pending plan cookie (e.g., signed in from pricing page)
-  // redirect to trial/start to activate the trial
+  // ── Signed-in user hitting sign-in/sign-up with plan cookie ──────────────
   if (userId && (req.nextUrl.pathname.startsWith('/sign-in') || req.nextUrl.pathname.startsWith('/sign-up'))) {
     const planCookie = req.cookies.get('cp_selected_plan')?.value;
     if (planCookie) {
-      const trialUrl = new URL('/trial/start', req.url);
-      return NextResponse.redirect(trialUrl);
+      return NextResponse.redirect(new URL('/trial/start', req.url));
     }
-    const dashboardUrl = new URL('/dashboard', req.url);
-    return NextResponse.redirect(dashboardUrl);
+    return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 
   return NextResponse.next();
@@ -104,9 +106,7 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
     '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    // Always run for API routes
     '/(api|trpc)(.*)',
   ],
 };

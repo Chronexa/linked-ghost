@@ -37,15 +37,14 @@ export default function TrialStartPage() {
                     voiceArchetype: 'expert',
                 }),
             });
+            // CRITICAL: getToken({ skipCache: true }) forces Clerk to mint a fresh
+            // JWT with onboardingComplete=true before we navigate. Without this,
+            // middleware sees stale JWT and loops back to /trial/start.
+            await getToken({ skipCache: true });
         } catch (error) {
             console.error('Failed to set onboarding complete flag', error);
         } finally {
-            // CRITICAL: refresh() forces Next.js to re-fetch the Clerk JWT so that
-            // the onboardingComplete=true metadata is picked up by middleware.
-            // Without this, middleware loops back to /trial/start.
-            router.refresh();
-            await new Promise((resolve) => setTimeout(resolve, 300));
-            router.push('/dashboard');
+            window.location.href = '/dashboard';
         }
     };
 
@@ -245,7 +244,7 @@ export default function TrialStartPage() {
             </div>
 
             {/* Global confetti animation */}
-            <style jsx global>{`
+            <style>{`
                 @keyframes confettiFall {
                     0% { opacity: 1; transform: translateY(0) rotate(0deg); }
                     100% { opacity: 0; transform: translateY(100vh) rotate(720deg); }

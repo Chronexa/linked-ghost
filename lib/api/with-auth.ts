@@ -77,7 +77,17 @@ export function withAuth(handler: AuthenticatedHandler) {
                 email: email,
                 fullName: fullName || 'Unknown User',
                 avatarUrl: clerkUser.imageUrl,
-              }).onConflictDoNothing();
+              }).onConflictDoUpdate({
+                // If email already exists (user re-registered with same email = new Clerk ID),
+                // update the row's id to the new Clerk ID so all FK constraints pass.
+                target: users.email,
+                set: {
+                  id: clerkUserId,
+                  fullName: fullName || 'Unknown User',
+                  avatarUrl: clerkUser.imageUrl,
+                  updatedAt: new Date(),
+                },
+              });
 
               console.log(`User ${email} synced to DB.`);
 

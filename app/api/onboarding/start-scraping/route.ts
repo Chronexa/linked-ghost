@@ -15,6 +15,7 @@ import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { profiles, users } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { ensureUserExists } from '@/lib/api/ensure-user';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,30 +43,14 @@ export async function POST(req: Request) {
             return new NextResponse('Invalid or missing LinkedIn URL', { status: 400 });
         }
 
-        // Ensure user row exists (Clerk webhook may not have fired on live)
-        try {
-            const existingUser = await db.query.users.findFirst({
-                where: eq(users.id, userId),
-            });
-            if (!existingUser) {
-                const { currentUser } = await import('@clerk/nextjs/server');
-                const clerkUser = await currentUser();
-                if (clerkUser) {
-                    await db.insert(users).values({
-                        id: userId,
-                        email: clerkUser.emailAddresses[0]?.emailAddress || '',
-                        fullName: `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || null,
-                        avatarUrl: clerkUser.imageUrl || null,
-                    }).onConflictDoNothing();
-                    console.log(`[StartScraping] Auto-created user row for ${userId}`);
-                }
-            }
-        } catch (syncErr) {
-            console.error('[StartScraping] User sync failed (non-fatal):', syncErr);
+        // Ensure user row exists — MUST happen before profile UPSERT due to FK constraint.
+        // Uses onConflictDoUpdate(email) to handle re-registration with same email (new Clerk ID).
+        const userOk = await ensureUserExists(userId);
+        if (!userOk) {
+            return new NextResponse('Failed to create user record. Please try signing out and back in.', { status: 500 });
         }
 
         // UPSERT profile: create if missing, update if exists
-        // This is critical — the Clerk webhook may not have fired, so the profile may not exist
         await db.insert(profiles).values({
             userId,
             linkedinUrl,
