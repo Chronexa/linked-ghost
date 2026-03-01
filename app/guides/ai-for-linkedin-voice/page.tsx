@@ -7,11 +7,47 @@ import { ArrowLeft } from 'lucide-react';
 export const metadata = {
     title: 'How to Use AI for LinkedIn Without Sounding Like a Robot | ContentPilot AI',
     description: 'The right way to use AI for your LinkedIn content — train it on your voice first.',
+    alternates: {
+        canonical: '/guides/ai-for-linkedin-voice',
+    },
+    openGraph: {
+        type: 'article',
+        title: 'How to Use AI for LinkedIn Without Sounding Like a Robot',
+        description: 'The right way to use AI for your LinkedIn content — train it on your voice first.',
+        url: '/guides/ai-for-linkedin-voice',
+    }
 };
 
 export default function GuideAILinkedInPage() {
     return (
         <div className="min-h-screen bg-white font-sans">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                        '@context': 'https://schema.org',
+                        '@type': 'Article',
+                        headline: 'How to Use AI for LinkedIn Without Sounding Like a Robot',
+                        description: 'The right way to use AI for your LinkedIn content — train it on your voice first.',
+                        author: {
+                            '@type': 'Organization',
+                            name: 'LinkedIn Ghostwriter AI',
+                        },
+                        publisher: {
+                            '@type': 'Organization',
+                            name: 'LinkedIn Ghostwriter AI',
+                            logo: {
+                                '@type': 'ImageObject',
+                                url: 'https://www.linkedinghostwriter-ai.com/favicon.ico',
+                            },
+                        },
+                        mainEntityOfPage: {
+                            '@type': 'WebPage',
+                            '@id': 'https://www.linkedinghostwriter-ai.com/guides/ai-for-linkedin-voice',
+                        },
+                    }),
+                }}
+            />
             <Navbar />
             <main className="container mx-auto px-6 pt-32 pb-24 max-w-3xl">
                 <Link href="/guides" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors mb-10 font-medium">

@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { usePostHog } from 'posthog-js/react';
+
 
 import ScraperLoadingScreen from '@/components/onboarding/scraper-loading-screen';
 import ConfirmProfileScreen from '@/components/onboarding/confirm-profile-screen';
@@ -27,6 +29,14 @@ type OnboardingStep = 'loading' | 'checking' | 'url-input' | 'scraping' | 'confi
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState<OnboardingStep>('checking');
+  const posthog = usePostHog();
+  const startedAt = useRef(Date.now());
+
+  // Fire onboarding_started once on mount
+  useEffect(() => {
+    posthog?.capture('onboarding_started');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Check initial scraper status on mount
   useEffect(() => {
@@ -79,6 +89,7 @@ export default function OnboardingPage() {
 
   // Handle LinkedIn URL submission from the URL input screen
   async function handleUrlSubmit(url: string) {
+    posthog?.capture('onboarding_linkedin_url_submitted');
     try {
       const res = await fetch('/api/onboarding/start-scraping', {
         method: 'POST',
@@ -88,30 +99,36 @@ export default function OnboardingPage() {
 
       if (!res.ok) throw new Error('Failed to start scraping');
 
+      posthog?.capture('onboarding_profile_scrape_started');
       setStep('scraping');
     } catch (err: any) {
       toast.error(err.message || 'Failed to start scraping');
+      posthog?.capture('onboarding_profile_scrape_failed', { error_type: 'start_failed' });
       setStep('manual');
     }
   }
 
   // Handle scraping completion → show confirmation
   const handleScrapingSuccess = useCallback(() => {
+    posthog?.capture('onboarding_profile_scrape_completed');
     setStep('confirm');
-  }, []);
+  }, [posthog]);
 
   // Handle scraping failure → show manual input
   const handleScrapingFailed = useCallback(() => {
+    posthog?.capture('onboarding_profile_scrape_failed', { error_type: 'scrape_failed' });
     setStep('manual');
-  }, []);
+  }, [posthog]);
 
   // Handle manual voice analysis completion → show confirmation
   function handleManualComplete() {
+    posthog?.capture('onboarding_voice_training_completed', { method: 'manual' });
     setStep('confirm');
   }
 
   // Handle skip → confirm with defaults
   async function handleSkip() {
+    posthog?.capture('onboarding_skipped', { step_name: 'confirm' });
     try {
       // Confirm with no pillars — will use defaults
       await fetch('/api/onboarding/confirm-profile', {
@@ -147,6 +164,16 @@ export default function OnboardingPage() {
       });
 
       if (!res.ok) throw new Error('Confirmation failed');
+
+      posthog?.capture('onboarding_profile_confirmed', {
+        pillar_count: confirmedPillarIds.length,
+        voice_archetype: archetype,
+        total_duration_seconds: Math.round((Date.now() - startedAt.current) / 1000),
+      });
+      posthog?.capture('onboarding_completed', {
+        pillar_count: confirmedPillarIds.length,
+        total_duration_seconds: Math.round((Date.now() - startedAt.current) / 1000),
+      });
 
       toast.success('🎉 Your AI ghostwriter is ready!');
       router.push('/dashboard');

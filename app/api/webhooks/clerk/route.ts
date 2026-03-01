@@ -12,6 +12,7 @@ import { db } from '@/lib/db';
 import { users, profiles } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { errors, responses } from '@/lib/api/response';
+import { analytics } from '@/lib/analytics/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,9 +80,11 @@ export async function POST(req: NextRequest) {
         console.log(`Unhandled webhook event: ${eventType}`);
     }
 
+    await analytics.shutdown();
     return responses.ok({ received: true, eventType });
   } catch (error) {
     console.error('Webhook error:', error);
+    await analytics.shutdown();
     return errors.internal('Webhook processing failed');
   }
 }
@@ -147,6 +150,23 @@ async function handleUserCreated(evt: WebhookEvent) {
       // Non-fatal — user will fall back to manual onboarding
     }
   }
+
+  // Analytics 
+  analytics.identify({
+    distinctId: newUser.id,
+    properties: {
+      email: email_addresses[0]?.email_address,
+      name: newUser.fullName,
+      plan: 'free',
+      onboarding_completed: false,
+    }
+  });
+
+  analytics.capture({
+    distinctId: newUser.id,
+    event: 'auth_signup_completed',
+    properties: { method: 'clerk_oauth_or_email' }
+  });
 
   console.log('User created:', newUser.id, linkedinUrl ? `(LinkedIn: ${linkedinUrl})` : '(no LinkedIn)');
 }

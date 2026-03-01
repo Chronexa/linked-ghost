@@ -31,6 +31,11 @@ const isPublicRoute = createRouteMatcher([
   '/guides(.*)',
   '/changelog(.*)',
   '/blog(.*)',
+  '/alternatives(.*)',
+
+  // SEO
+  '/sitemap.xml',
+  '/robots.txt',
 
   // Legal
   '/legal(.*)',

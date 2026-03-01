@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui';
 import { useState } from 'react';
 import { Menu, X } from 'lucide-react';
+import { GhostLogo } from '@/components/brand/ghost-logo';
 
 export function Navbar() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -20,6 +21,7 @@ export function Navbar() {
             <div className="max-w-[1100px] mx-auto px-6">
                 <div className="flex items-center justify-between h-16">
                     <Link href="/" className="flex items-center space-x-2" aria-label="LinkedIn Ghostwriter AI Home">
+                        <GhostLogo size={32} />
                         <span className="text-xl font-display font-semibold text-gray-900 tracking-tight">
                             LinkedIn Ghostwriter AI
                         </span>

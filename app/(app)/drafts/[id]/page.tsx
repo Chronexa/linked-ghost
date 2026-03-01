@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Copy, Check, ChevronLeft, Calendar, FileText, Sparkles, Wand2, Loader2, Send } from 'lucide-react';
 import { draftsApi } from '@/lib/api-client';
+import { usePostHog } from 'posthog-js/react';
+
 
 export default function DraftEditorPage() {
   const params = useParams() as { id: string };
@@ -27,6 +29,8 @@ export default function DraftEditorPage() {
   const updateDraft = useUpdateDraft();
   const approveDraft = useApproveDraft();
   const scheduleDraft = useScheduleDraft();
+  const posthog = usePostHog();
+
 
   const [editedText, setEditedText] = useState('');
   const [feedbackNotes, setFeedbackNotes] = useState('');
@@ -54,6 +58,14 @@ export default function DraftEditorPage() {
     // Copy to clipboard
     navigator.clipboard.writeText(editedText);
 
+    // 🔥 North star event — user has real intent to post
+    posthog?.capture('draft_copied', {
+      draft_id: currentDraft.id,
+      variant_letter: currentDraft.variantLetter,
+      char_count: editedText.length,
+      source: 'copy_and_post',
+    });
+
     // Show educational toast
     toast.success('Draft copied! Paste it into LinkedIn. Come back tomorrow to track your engagement.', { duration: 6000 });
 
@@ -64,6 +76,12 @@ export default function DraftEditorPage() {
     await updateDraft.mutateAsync({
       id: currentDraft.id,
       data: { status: 'posted', fullText: editedText }
+    });
+
+    posthog?.capture('draft_posted', {
+      draft_id: currentDraft.id,
+      variant_letter: currentDraft.variantLetter,
+      char_count: editedText.length,
     });
 
     if (conversationId) {
@@ -163,6 +181,12 @@ export default function DraftEditorPage() {
         onSchedule={(date) => { setScheduledFor(date); handleSchedule(); }}
         isPending={updateDraft.isPending || approveDraft.isPending}
         singleMode
+        onCopy={(text) => posthog?.capture('draft_copied', {
+          draft_id: currentDraft.id,
+          variant_letter: currentDraft.variantLetter,
+          char_count: text.length,
+          source: 'copy_button',
+        })}
       />
     </div>
   );
@@ -178,7 +202,8 @@ function DraftVariantCard({
   onReject,
   onSchedule,
   isPending,
-  singleMode = false
+  singleMode = false,
+  onCopy,
 }: {
   draft: any,
   text: string,
@@ -189,7 +214,8 @@ function DraftVariantCard({
   onReject: () => void,
   onSchedule: (date: string) => void,
   isPending: boolean,
-  singleMode?: boolean
+  singleMode?: boolean,
+  onCopy?: (text: string) => void,
 }) {
   const [showScheduler, setShowScheduler] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
@@ -223,6 +249,7 @@ function DraftVariantCard({
               onClick={() => {
                 navigator.clipboard.writeText(text);
                 toast.success('Copied to clipboard');
+                onCopy?.(text);
               }}
             >
               <Copy className="h-4 w-4" />

@@ -7,11 +7,47 @@ import { ArrowLeft } from 'lucide-react';
 export const metadata = {
     title: 'How to Find Your Content Pillars | ContentPilot AI',
     description: 'Define the 3–5 topics you should own on LinkedIn. A framework from ContentPilot AI.',
+    alternates: {
+        canonical: '/guides/finding-your-content-pillars',
+    },
+    openGraph: {
+        type: 'article',
+        title: 'How to Find Your 3–5 Core Content Pillars',
+        description: 'Define the 3–5 topics you should own on LinkedIn. A framework from ContentPilot AI.',
+        url: '/guides/finding-your-content-pillars',
+    }
 };
 
 export default function GuideContentPillarsPage() {
     return (
         <div className="min-h-screen bg-white font-sans">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                        '@context': 'https://schema.org',
+                        '@type': 'Article',
+                        headline: 'How to Find Your 3–5 Core Content Pillars',
+                        description: 'Define the 3–5 topics you should own on LinkedIn. A framework from ContentPilot AI.',
+                        author: {
+                            '@type': 'Organization',
+                            name: 'LinkedIn Ghostwriter AI',
+                        },
+                        publisher: {
+                            '@type': 'Organization',
+                            name: 'LinkedIn Ghostwriter AI',
+                            logo: {
+                                '@type': 'ImageObject',
+                                url: 'https://www.linkedinghostwriter-ai.com/favicon.ico',
+                            },
+                        },
+                        mainEntityOfPage: {
+                            '@type': 'WebPage',
+                            '@id': 'https://www.linkedinghostwriter-ai.com/guides/finding-your-content-pillars',
+                        },
+                    }),
+                }}
+            />
             <Navbar />
             <main className="container mx-auto px-6 pt-32 pb-24 max-w-3xl">
                 <Link href="/guides" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors mb-10 font-medium">

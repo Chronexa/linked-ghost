@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ClerkProvider } from '@clerk/nextjs';
 import { Space_Grotesk, Inter } from 'next/font/google';
 import { Providers } from '@/lib/providers';
+import { PostHogProvider } from '@/components/analytics/posthog-provider';
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -23,19 +24,22 @@ export const metadata: Metadata = {
     default: "LinkedIn Ghostwriter AI - Your LinkedIn Ghostwriter That Sounds Like You",
     template: "%s | LinkedIn Ghostwriter AI",
   },
-  description: "Transform industry news, insights, and data into engaging LinkedIn posts in under 3 minutes. AI-powered content in your voice.",
+  description: "LinkedIn Ghostwriter AI researches trending topics in your niche, learns your writing style, and generates ready-to-post LinkedIn drafts in under 3 minutes. Start your 7-day free trial.",
   keywords: [
-    "LinkedIn",
-    "content creation",
-    "AI writing",
-    "ghostwriter",
-    "social media",
-    "content automation",
-    "LinkedIn posts",
+    "LinkedIn ghostwriter AI",
+    "AI LinkedIn post generator",
+    "LinkedIn content automation tool",
+    "write LinkedIn posts automatically",
+    "AI ghostwriter for LinkedIn",
+    "LinkedIn personal branding tool",
+    "LinkedIn content creation",
     "AI copywriting",
+    "content automation",
+    "social media AI",
   ],
   authors: [{ name: "LinkedIn Ghostwriter AI" }],
   creator: "LinkedIn Ghostwriter AI",
+  metadataBase: new URL("https://www.linkedinghostwriter-ai.com"),
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -55,7 +59,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "LinkedIn Ghostwriter AI - Your LinkedIn Ghostwriter",
-    description: "AI-powered LinkedIn content in your voice",
+    description: "AI-powered LinkedIn content in your voice, in 3 minutes",
     images: ["/og-image.png"],
     creator: "@linkedghostai",
   },
@@ -88,7 +92,9 @@ export default function RootLayout({
       <html lang="en">
         <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
           <Providers>
-            {children}
+            <PostHogProvider>
+              {children}
+            </PostHogProvider>
           </Providers>
         </body>
       </html>

@@ -1,14 +1,13 @@
 import { SignIn } from '@clerk/nextjs';
+import { GhostLogo } from '@/components/brand/ghost-logo';
 
 export default function SignInPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-brand rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-            </svg>
+          <div className="w-16 h-16 bg-[#FEF3EF] rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <GhostLogo size={40} />
           </div>
           <h1 className="font-display text-3xl font-bold text-charcoal mb-2">
             Welcome Back

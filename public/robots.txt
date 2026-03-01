@@ -1,8 +1,0 @@
-# https://www.robotstxt.org/robotstxt.html
-User-agent: *
-Allow: /
-Disallow: /api/
-Disallow: /dashboard/
-Disallow: /settings/
-
-Sitemap: https://contentpilot.ai/sitemap.xml

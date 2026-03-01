@@ -22,6 +22,8 @@ import { WritePostModal } from '@/components/topics/write-post-modal';
 import { Search, Layers, Sparkles, Filter, CheckCircle2, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
+import { usePostHog } from 'posthog-js/react';
+
 
 type Tab = 'research' | 'ideas' | 'ready';
 
@@ -64,6 +66,8 @@ export default function TopicsPage() {
   const createRawTopic = useCreateRawTopic();
   const generateDrafts = useGenerateDrafts();
   const discoverTopics = useDiscoverTopics();
+  const posthog = usePostHog();
+
 
   // Derived Data
   const rawTopics = useMemo(() => (rawData as any)?.data?.data ?? [], [rawData]);
@@ -91,6 +95,8 @@ export default function TopicsPage() {
     if (!searchQuery.trim()) return;
     setSuggestedTopics([]);
     setSelectedSuggestionIndices(new Set());
+    posthog?.capture('topics_searched', { query_length: searchQuery.trim().length });
+
 
     discoverTopics.mutate(
       {
@@ -185,9 +191,16 @@ export default function TopicsPage() {
   };
 
   const handleGenerate = (topic: any) => {
+    posthog?.capture('topic_draft_started', {
+      topic_id: topic.id,
+      topic_source: topic.source ?? 'perplexity',
+      pillar_id: topic.pillarId,
+      ai_score: topic.aiScore,
+    });
     setSelectedTopicForGeneration(topic);
     setWritePostModalOpen(true);
   };
+
 
   return (
     <div className="space-y-6 container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

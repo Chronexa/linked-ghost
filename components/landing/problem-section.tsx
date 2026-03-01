@@ -1,12 +1,13 @@
 "use client";
 
 import { motion, useReducedMotion } from 'framer-motion';
+import { GhostReading } from '@/components/brand/ghost-reading';
 
 export function ProblemSection() {
     const shouldReduceMotion = useReducedMotion();
 
     return (
-        <section className="w-full bg-[#FAFAF7] py-32" aria-labelledby="problem-title">
+        <section className="w-full bg-[#FAFAF7] py-32 relative overflow-hidden" aria-labelledby="problem-title">
             <div className="container mx-auto px-6 max-w-[1100px]">
                 <div className="text-center max-w-3xl mx-auto mb-16">
                     <h2 id="problem-title" className="font-display text-4xl md:text-5xl font-bold text-gray-900 mb-6 tracking-tight">
@@ -37,6 +38,9 @@ export function ProblemSection() {
                     ))}
                 </div>
             </div>
+
+            {/* Ambient ghost — peering over the problem cards, reading the situation */}
+            <GhostReading className="absolute -bottom-6 right-4 md:right-12 w-[140px] md:w-[180px] opacity-[0.18] pointer-events-none select-none" />
         </section>
     );
 }

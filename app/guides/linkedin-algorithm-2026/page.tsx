@@ -7,11 +7,47 @@ import { ArrowLeft } from 'lucide-react';
 export const metadata = {
     title: 'How the LinkedIn Algorithm Works in 2026 | ContentPilot AI',
     description: 'A practical breakdown of what LinkedIn actually rewards — and what tanks your reach — in 2026.',
+    alternates: {
+        canonical: '/guides/linkedin-algorithm-2026',
+    },
+    openGraph: {
+        type: 'article',
+        title: 'How the LinkedIn Algorithm Really Works in 2026',
+        description: 'A practical breakdown of what LinkedIn actually rewards — and what it penalizes. Stop guessing, start optimizing.',
+        url: '/guides/linkedin-algorithm-2026',
+    }
 };
 
 export default function GuideLinkedInAlgorithmPage() {
     return (
         <div className="min-h-screen bg-white font-sans">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                        '@context': 'https://schema.org',
+                        '@type': 'Article',
+                        headline: 'How the LinkedIn Algorithm Really Works in 2026',
+                        description: 'A practical breakdown of what LinkedIn actually rewards — and what it penalizes. Stop guessing, start optimizing.',
+                        author: {
+                            '@type': 'Organization',
+                            name: 'LinkedIn Ghostwriter AI',
+                        },
+                        publisher: {
+                            '@type': 'Organization',
+                            name: 'LinkedIn Ghostwriter AI',
+                            logo: {
+                                '@type': 'ImageObject',
+                                url: 'https://www.linkedinghostwriter-ai.com/favicon.ico',
+                            },
+                        },
+                        mainEntityOfPage: {
+                            '@type': 'WebPage',
+                            '@id': 'https://www.linkedinghostwriter-ai.com/guides/linkedin-algorithm-2026',
+                        },
+                    }),
+                }}
+            />
             <Navbar />
             <main className="container mx-auto px-6 pt-32 pb-24 max-w-3xl">
                 <Link href="/guides" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors mb-10 font-medium">

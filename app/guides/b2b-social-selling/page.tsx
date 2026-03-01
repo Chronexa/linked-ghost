@@ -7,11 +7,47 @@ import { ArrowLeft } from 'lucide-react';
 export const metadata = {
     title: 'B2B Social Selling on LinkedIn | ContentPilot AI',
     description: 'Turn LinkedIn views into inbound leads. A tactical guide to B2B social selling from ContentPilot AI.',
+    alternates: {
+        canonical: '/guides/b2b-social-selling',
+    },
+    openGraph: {
+        type: 'article',
+        title: 'B2B Social Selling: Turning LinkedIn Views Into Pipeline',
+        description: 'Turn LinkedIn views into inbound leads. A tactical guide to B2B social selling from ContentPilot AI.',
+        url: '/guides/b2b-social-selling',
+    }
 };
 
 export default function GuideSocialSellingPage() {
     return (
         <div className="min-h-screen bg-white font-sans">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                        '@context': 'https://schema.org',
+                        '@type': 'Article',
+                        headline: 'B2B Social Selling: Turning LinkedIn Views Into Pipeline',
+                        description: 'Turn LinkedIn views into inbound leads. A tactical guide to B2B social selling from ContentPilot AI.',
+                        author: {
+                            '@type': 'Organization',
+                            name: 'LinkedIn Ghostwriter AI',
+                        },
+                        publisher: {
+                            '@type': 'Organization',
+                            name: 'LinkedIn Ghostwriter AI',
+                            logo: {
+                                '@type': 'ImageObject',
+                                url: 'https://www.linkedinghostwriter-ai.com/favicon.ico',
+                            },
+                        },
+                        mainEntityOfPage: {
+                            '@type': 'WebPage',
+                            '@id': 'https://www.linkedinghostwriter-ai.com/guides/b2b-social-selling',
+                        },
+                    }),
+                }}
+            />
             <Navbar />
             <main className="container mx-auto px-6 pt-32 pb-24 max-w-3xl">
                 <Link href="/guides" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors mb-10 font-medium">

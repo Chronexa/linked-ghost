@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Dna, LayoutTemplate, Sparkles, Check } from 'lucide-react';
+import { GhostLoader } from '@/components/brand/ghost-loader';
 
 interface ScraperLoadingScreenProps {
     onSuccess: () => void;
@@ -99,33 +100,9 @@ export default function ScraperLoadingScreen({ onSuccess, onFailed }: ScraperLoa
             </div>
 
             <div className="relative z-10 w-full flex flex-col items-center py-12">
-                {/* Custom Brand Spinner */}
-                <div className="relative mb-8 flex justify-center items-center">
-                    <svg className="w-16 h-16 animate-spin text-saas-brand/20" viewBox="0 0 100 100">
-                        <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="8" />
-                        <motion.circle
-                            cx="50"
-                            cy="50"
-                            r="45"
-                            fill="none"
-                            stroke="var(--brand)"
-                            strokeWidth="8"
-                            strokeLinecap="round"
-                            initial={{ strokeDasharray: "1 200", strokeDashoffset: 0 }}
-                            animate={{
-                                strokeDasharray: ["1 200", "90 150", "90 150"],
-                                strokeDashoffset: [0, -40, -120]
-                            }}
-                            transition={{
-                                duration: 2,
-                                ease: "easeInOut",
-                                repeat: Infinity
-                            }}
-                        />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-saas-text-primary font-bold text-xl tracking-tighter">CP</span>
-                    </div>
+                {/* Ghost Writer Loader */}
+                <div className="mb-6">
+                    <GhostLoader size="lg" />
                 </div>
 
                 <h2 className="text-2xl font-semibold text-saas-text-primary tracking-tight mb-2">

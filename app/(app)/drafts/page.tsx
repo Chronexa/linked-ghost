@@ -10,6 +10,8 @@ import { useDrafts, useApproveDraft } from '@/lib/hooks/use-drafts';
 import { usePillars } from '@/lib/hooks/use-pillars';
 import { formatRelativeTime } from '@/lib/utils';
 import { Draft, Pillar } from '@/types';
+import { usePostHog } from 'posthog-js/react';
+
 
 // Define the response structure if not exported from hooks (or cast to unknown first)
 // Ideally hooks should return typed data.
@@ -35,6 +37,8 @@ export default function DraftsPage() {
   const { data: draftsDataResponse, isLoading: draftsLoading } = useDrafts({ limit: 100 });
   const { data: pillarsDataResponse } = usePillars({ status: 'active' });
   const approveDraft = useApproveDraft();
+  const posthog = usePostHog();
+
 
   // Safely extract data with type assertions for now, assuming hook response structure
   // In a full refactor, useDrafts should return Draft[] directly or a typed response.
@@ -92,10 +96,12 @@ export default function DraftsPage() {
   const handleApprove = async (id: string) => {
     try {
       await approveDraft.mutateAsync(id);
+      posthog?.capture('draft_published', { draft_id: id, source: 'drafts_list' });
     } catch (error) {
       // Error handled by hook
     }
   };
+
 
   const statusOptions = [
     { label: 'All Statuses', value: 'all' },

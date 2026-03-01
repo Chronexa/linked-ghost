@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { GhostLogo } from '@/components/brand/ghost-logo';
 
 export function Footer() {
     return (
@@ -8,6 +9,7 @@ export function Footer() {
                     {/* Brand */}
                     <div className="col-span-2 md:col-span-2">
                         <Link href="/" className="flex items-center space-x-2 mb-6" aria-label="LinkedIn Ghostwriter AI Home">
+                            <GhostLogo size={28} animate={false} />
                             <span className="text-xl font-display font-semibold text-white tracking-tight">
                                 LinkedIn Ghostwriter AI
                             </span>
@@ -61,8 +63,8 @@ export function Footer() {
 
                 <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center text-sm text-gray-500">
                     <p>© {new Date().getFullYear()} LinkedIn Ghostwriter AI. All rights reserved.</p>
-                    <div className="mt-4 md:mt-0">
-                        Engineered for LinkedIn Growth
+                    <div className="mt-4 md:mt-0 flex items-center gap-1.5">
+                        Made with 👻 by LinkedIn Ghostwriter AI
                     </div>
                 </div>
             </div>

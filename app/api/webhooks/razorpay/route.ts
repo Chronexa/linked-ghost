@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { subscriptions, usageTracking } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { format } from 'date-fns';
+import { analytics } from '@/lib/analytics/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -102,6 +103,14 @@ export async function POST(req: NextRequest) {
                         .where(eq(subscriptions.razorpaySubscriptionId, subscriptionId));
                 }
 
+                if (userId) {
+                    analytics.capture({
+                        distinctId: userId,
+                        event: 'billing_trial_started',
+                        properties: { plan_name: subscriptionEntity?.notes?.planId || 'growth' }
+                    });
+                }
+
                 console.log(`[rzp-webhook] ${subscriptionId} → trialing`);
                 break;
             }
@@ -149,6 +158,19 @@ export async function POST(req: NextRequest) {
                             updatedAt: new Date(),
                         })
                         .where(eq(subscriptions.razorpaySubscriptionId, subscriptionId));
+                }
+
+                const amountUsd = subscriptionEntity?.plan_id ? 29 : 0; // approximate, ideally from plan table
+                if (userId) {
+                    analytics.capture({
+                        distinctId: userId,
+                        event: 'billing_upgrade_completed',
+                        properties: {
+                            plan_name: subscriptionEntity?.notes?.planId || 'growth',
+                            billing_period: subscriptionEntity?.notes?.billingInterval || 'monthly',
+                            amount_usd: amountUsd
+                        }
+                    });
                 }
 
                 console.log(`[rzp-webhook] ${subscriptionId} → active`);
@@ -224,6 +246,18 @@ export async function POST(req: NextRequest) {
                         updatedAt: new Date(),
                     })
                     .where(eq(subscriptions.razorpaySubscriptionId, subscriptionId));
+
+                const sub = await db.query.subscriptions.findFirst({
+                    where: eq(subscriptions.razorpaySubscriptionId, subscriptionId),
+                });
+                if (sub?.userId) {
+                    analytics.capture({
+                        distinctId: sub.userId,
+                        event: 'billing_cancelled',
+                        properties: { plan_name: sub.planType }
+                    });
+                }
+
                 console.log(`[rzp-webhook] ${subscriptionId} → canceled`);
                 break;
             }
@@ -251,6 +285,14 @@ export async function POST(req: NextRequest) {
 
             case 'payment.failed': {
                 // Log only — access decision is driven by subscription.halted
+                const userId = event.payload?.payment?.entity?.notes?.userId;
+                if (userId) {
+                    analytics.capture({
+                        distinctId: userId,
+                        event: 'billing_upgrade_failed',
+                        properties: { error_code: event.payload?.payment?.entity?.error_code }
+                    });
+                }
                 console.warn(`[rzp-webhook] payment.failed for subscription ${subscriptionId} — monitoring only`);
                 break;
             }
@@ -265,5 +307,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Always 200 — even on handler errors
+    await analytics.shutdown();
     return NextResponse.json({ received: true }, { status: 200 });
 }
